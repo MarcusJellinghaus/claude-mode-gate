@@ -22,6 +22,11 @@ Out of scope for this repo:
 • The recent-skills display. It is a separate mod in its own repo (claude-recent-skills).
 • Sandboxing. A mod runs with the user's permissions and is not a sandbox. mode-gate gates Claude's tool calls only.
 • Replacing Claude Code's permission rules. Deny rules and organisation policy keep precedence.
+Working principles
+• TDD: write a failing test first, then the simplest code that passes, then refactor.
+• KISS: the simplest design that works. Nothing without a present need.
+• Clean code: small functions, names that state intent, no dead code, comments explain why.
+• Concise writing: chat, commits, PRs, docs and comments are short and readable.
 What we agreed
 Topic
 Decision

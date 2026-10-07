@@ -31,6 +31,13 @@ If you can't name the gap, use the MCP tool. Exempt: the approved `npm run` chec
 
 Ask questions as plain text in the chat, not with a question tool. Tell me at once if the MCP tools are not available.
 
+## Principles
+
+- **TDD.** Write a failing test first, make it pass with the simplest code, then refactor. A bug fix starts with a failing test that reproduces it.
+- **KISS.** Choose the simplest design that works. No feature, option or abstraction without a present need. Defer what the open questions in `idea.md` leave open.
+- **Clean code.** Small functions with one job. Names that state intent. No dead code and no comments that restate the code. Comments explain why, not what.
+- **Concise writing.** Chat, commit messages, PR text, docs and comments are short and readable. Lead with the outcome, say it once, and use complete sentences.
+
 ## Commands
 
 Run everything with `npm run check`. It runs each gate below in order and stops at the first failure. Individual gates:
@@ -75,7 +82,7 @@ Rules for writing tests:
 
 - Test behaviour through `decide`, not its internals.
 - Every security rule gets a negative test: the case that must not be allowed.
-- A bug fix starts with a failing test.
+- Write the test before the code (see Principles).
 - Tests must not touch the real `~/.claude`, the network or the clock.
 
 ## Architecture rules
