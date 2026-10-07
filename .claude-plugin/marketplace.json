@@ -5,7 +5,7 @@
     {
       "name": "mode-gate",
       "source": "./",
-      "description": "Switchable permission modes for Claude Code."
+      "description": "Switchable permission profiles for Claude Code."
     }
   ]
 }

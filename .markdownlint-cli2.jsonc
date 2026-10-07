@@ -9,7 +9,6 @@
     ".claude/skills/**",
     ".claude/agents/**",
     "node_modules/**",
-    "idea.md",
     "coverage/**",
     ".stryker-tmp/**",
     "reports/**",

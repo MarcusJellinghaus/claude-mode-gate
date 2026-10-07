@@ -1,6 +1,6 @@
-1# CLAUDE.md
+# CLAUDE.md
 
-claude-mode-gate is a Claude Code mod (TypeScript, strict mode) with switchable permission modes. Goals, decisions and open questions live in [idea.md](idea.md). Read it first.
+claude-mode-gate is a Claude Code mod (TypeScript, strict mode) with switchable permission profiles. Goals, decisions and open items live in [docs/design.md](docs/design.md). Read it first.
 
 ## MCP tools
 
@@ -34,7 +34,7 @@ Ask questions as plain text in the chat, not with a question tool. Tell me at on
 ## Principles
 
 - **TDD.** Write a failing test first, make it pass with the simplest code, then refactor. A bug fix starts with a failing test that reproduces it.
-- **KISS.** Choose the simplest design that works. No feature, option or abstraction without a present need. Defer what the open questions in `idea.md` leave open.
+- **KISS.** Choose the simplest design that works. No feature, option or abstraction without a present need. Defer what "Later" and "Open items" in `docs/design.md` leave open.
 - **Clean code.** Small functions with one job. Names that state intent. No dead code and no comments that restate the code. Comments explain why, not what.
 - **Concise writing.** Chat, commit messages, PR text, docs and comments are short and readable. Lead with the outcome, say it once, and use complete sentences.
 
@@ -72,11 +72,11 @@ The strategy is layered. Cheap, deterministic gates run first, and the security 
    - protected paths, including relative paths and `..`;
    - that a deny from Claude Code is never overridden;
    - that unknown input falls back to `ask` or `deny`, never `allow`.
-4. **Wiring tests.** `register.ts` is thin and is tested through the plugin test kit once its API is verified (assumption 4 in idea.md). Include fail-closed tests (a guard that throws produces a deny), the reset test (after `/clear` the mode is not silently permissive) and the band test.
+4. **Wiring tests.** `register.ts` is thin and is tested through the plugin test kit once its API is verified (assumption 4 in `docs/design.md`). Include fail-closed tests (a guard that throws produces a deny), the reset test (after `/clear` no profile stays active) and the band test.
 5. **Mutation tests (Stryker).** Line coverage says little about a policy function. Mutation testing shows whether a flipped condition or a changed `allow`/`deny` would be caught. It runs weekly and on demand in CI.
 6. **Contract checks.** `check:manifests` validates the manifests and `check:catch` validates the fail-closed rule. `claude plugin validate` and `claude plugin test` join CI once verified, pinned to a Claude Code version, plus a weekly run against the latest.
 7. **Documentation checks.** markdownlint, a link check (lychee, CI only) and `check:docs`. A change that alters behaviour updates README.md and CHANGELOG.md in the same commit.
-8. **Security checks.** `npm audit` and gitleaks in CI. SECURITY.md is kept in step with the security model in idea.md.
+8. **Security checks.** `npm audit` and gitleaks in CI. SECURITY.md is kept in step with the security model in `docs/design.md`.
 
 Rules for writing tests:
 
@@ -99,4 +99,4 @@ Enforced by `npm run arch` and `tests/repo-structure.test.ts`.
 
 - Work on a feature branch. Commit and push after each major change.
 - Run `npm run check` before committing. CI runs the same gates, plus the Windows matrix, link check, secret scan and mutation tests.
-- Do not add a LICENSE or pick the marketplace name without asking. Both are open decisions in idea.md.
+- Do not add a LICENSE or pick the marketplace name without asking. Both are open items in `docs/design.md`.

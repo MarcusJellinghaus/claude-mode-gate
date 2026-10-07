@@ -3,6 +3,5 @@ coverage/
 .stryker-tmp/
 reports/
 package-lock.json
-idea.md
 .claude/skills/
 .claude/agents/

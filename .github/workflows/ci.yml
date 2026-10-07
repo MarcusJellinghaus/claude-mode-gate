@@ -63,7 +63,7 @@ jobs:
       - run: npm run check:manifests
       - run: npm run check:catch
       # TODO: add `claude plugin validate` and `claude plugin test`, pinned to a Claude Code
-      # version, once the CLI commands are verified (idea.md, "Verify").
+      # version, once the CLI commands are verified (docs/design.md, "Work plan").
 
   docs:
     name: Documentation

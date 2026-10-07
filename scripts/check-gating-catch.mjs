@@ -1,5 +1,5 @@
 // Fail-closed guard: every gating hook registered in hooks/register.ts must have a .catch handler.
-// Gating events are those that can allow or deny a call (see idea.md, "Failure").
+// Gating events are those that can allow or deny a call (see docs/design.md, "Failure").
 // The registration syntax ($.on("event", ...)) is an assumption until the mods API is verified.
 import { readFileSync } from "node:fs";
 

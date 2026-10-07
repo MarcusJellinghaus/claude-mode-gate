@@ -1,14 +1,15 @@
 # claude-mode-gate
 
-A Claude Code mod with switchable permission modes: one command changes what Claude may do, and everything outside the active mode still asks.
+A Claude Code mod with switchable permission profiles: a safe baseline, named profiles you switch on and off, and everything else still asks.
 
-**Status:** design stage, nothing is built yet. See [idea.md](idea.md) for goals, decisions and open points.
+**Status:** design stage, nothing is built yet. See [docs/design.md](docs/design.md) for goals, decisions and open points.
 
 ## Goals
 
-1. Different modes: named modes, each allowing only the tool calls scoped to it.
-2. Simple control: one command changes mode, and the current mode is always visible.
-3. Tighter security: Bash always needs manual approval unless the active mode or command explicitly allows that exact call.
+1. Limited by default: read access and a few undoable project writes.
+2. Profiles: named bundles of rules you switch on and off, several at once.
+3. Simple, visible control: one command per action, and the active profiles are always shown.
+4. Tighter security: Bash asks unless an active rule allows that call, and a denied call says which tool to use instead.
 
 ## What it can reach
 

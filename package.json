@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "A Claude Code mod with switchable permission modes: one command changes what Claude may do, and everything outside the active mode still asks.",
+  "description": "A Claude Code mod with switchable permission profiles: a safe baseline, named profiles you switch on and off, and everything else still asks.",
   "engines": {
     "node": ">=22.12"
   },

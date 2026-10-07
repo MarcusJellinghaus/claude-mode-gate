@@ -1,0 +1,229 @@
+# claude-mode-gate: design
+
+Updated 7 October 2026. Owner: Marcus Jellinghaus.
+
+## Summary
+
+mode-gate is a Claude Code mod that limits what Claude may do. A fixed **baseline** allows read access and a few undoable project writes. Named **profiles** add more rules (allow, ask, deny). The user switches profiles on and off with one command. Everything else asks, and Bash asks unless a rule allows that exact kind of call.
+
+The design is agreed. Nothing is built yet. Several API details are unverified (see [Unverified assumptions](#unverified-assumptions)), so a verification spike comes first.
+
+Repo description: A Claude Code mod with switchable permission profiles: a safe baseline, named profiles you switch on and off, and everything else still asks.
+
+## Goals and non-goals
+
+Goals, in priority order:
+
+1. **Limited access by default.** Read access (including running checks and tests) plus a few write tools confined to the project folder, all undoable with git.
+2. **Profiles.** The user switches named profiles on and off. Several can be active at once.
+3. **Simple, visible control.** One command per action. The active profiles are always visible.
+4. **Tighter security.** Bash needs manual approval unless a rule allows that call. Nothing is allowed by default beyond the baseline.
+5. **Guidance.** A denied Bash call tells Claude which approved tool to use instead.
+
+Non-goals:
+
+- The recent-skills display. It is a separate mod (claude-recent-skills).
+- Sandboxing. A mod runs with the user's permissions. mode-gate gates Claude's tool calls only.
+- Replacing Claude Code's permission rules. Deny rules and organisation policy keep precedence.
+
+## Working principles
+
+- TDD: write a failing test first, then the simplest code that passes, then refactor.
+- KISS: the simplest design that works. Nothing without a present need.
+- Clean code: small functions, names that state intent, no dead code, comments explain why.
+- Concise writing: chat, commits, PRs, docs and comments are short and readable.
+
+## Concepts
+
+- **Baseline.** Always-on rules. Reads, undoable project writes through the mcp-workspace tools, and a fixed set of check commands. It also holds the fixed denies (protected paths).
+- **Profile.** A named bundle with a description and three rule lists: `allow`, `ask` and `deny`. The same shape as the `permissions` block in `settings.json`. A profile that only has `deny` entries is a restriction, for example a read-only profile.
+- **Active set.** The baseline plus the profiles that are switched on.
+- **Rule syntax.** Claude Code's: `mcp__server__tool`, `Bash(npm run check)`, `Bash(git commit *)`.
+
+### Decision order
+
+The first rule that matches wins:
+
+1. A subagent calls Bash and holds no rule for it: deny, with the redirect message.
+2. Edit or Write targets a protected path: deny.
+3. Across the active set, deny beats ask beats allow.
+4. A call that matches nothing keeps Claude Code's own verdict.
+
+A deny from Claude Code is never overridden. An allow from Claude Code is downgraded to ask for Bash unless an active rule allows the call.
+
+### Matching
+
+- Tools match by name and, later, by argument. Version 1 uses whole-tool rules only.
+- Bash rules are prefix rules in Claude Code's syntax. A Bash rule matches only if the command contains none of `& ; | $ ( ) \` < >` or a newline. Anything unusual asks.
+- Issue and GitHub work uses the typed mcp-workspace tools, not Bash text.
+
+## Commands
+
+| Command                  | Purpose                                                          |
+| ------------------------ | ---------------------------------------------------------------- |
+| `/gate-on <profile>...`  | Switch profiles on. Prints a short summary of what they allow.   |
+| `/gate-off <profile>...` | Switch profiles off. `all` switches every profile off.           |
+| `/gate-status`           | Baseline, active profiles and the files they came from.          |
+| `/gate-why [n]`          | The last n verdicts with the rule and profile that fired.        |
+| `/gate-check`            | Validate the config: conflicts, unknown tools, over-broad rules. |
+| `/gate-explain <tool> …` | Dry run one call and show the verdict and the rule chain.        |
+
+Replay runs offline as a command-line tool. It reads a Claude Code session transcript and reports what each call would have been under a given config.
+
+Only the user switches profiles. The mod registers no tool that Claude could call to switch.
+
+## Lifetimes
+
+- A profile the user switches on lasts the session.
+- A profile that a skill declares lasts until the next prompt.
+- Profiles are cleared on `/clear` and never restored on resume.
+- The band shows profile names, so a forgotten profile stays visible.
+
+## Subagents
+
+- A subagent gets the baseline plus the profiles its parent assigns at spawn.
+- The parent can assign only profiles it holds, so authority only narrows down the tree. The chain ends at the user.
+- The prompt tells the subagent to use only those profiles. The mod enforces the same list.
+- A denied call returns a message naming the profile that would be needed. The subagent stops and reports. The parent decides, and profiles marked non-delegable go to the user. There is no request tool.
+- Revoking a profile also removes the copies delegated from it.
+
+Later: skills and agents may declare profiles in their definitions, which would make the dedicated "specialist" agents unnecessary.
+
+## Headless runs
+
+- Starting profiles come from the environment variable `MODE_GATE_PROFILES`, read once at session start, for example `MODE_GATE_PROFILES=issues,git-write`. A repo cannot set it.
+- Profiles cannot change during a run.
+- A call that would ask is denied, with a message naming the profile that would be needed.
+
+## Permission modes
+
+Auto and bypass mode are out of scope for version 1. The README says the mod is built for the default modes. If the API shows the mode, profiles do not loosen anything in auto or bypass. A later **enforce mode** could invert this: baseline plus profiles become the allowlist, and everything else is denied.
+
+## Protected paths
+
+- **Deny** Edit and Write on the mod's config and source, `settings*.json`, hooks, shell profiles and the log folder.
+- **Ask** for the rest of `.claude/` (skills, agents).
+- Other write routes (PowerShell, NotebookEdit, MCP file tools, symbolic links) are a known gap.
+
+## Decision log
+
+- The mod writes a log file in a configurable folder (default `logs`).
+- Each entry has a timestamp, the verdict, the rule and profile that fired, the agent and the tool name. It records no arguments.
+- `/gate-why` reads the log. Replay uses session transcripts, not the log.
+
+## Failure
+
+Every gating hook has a `.catch` handler that fails closed (ask or deny, never allow).
+
+## Code structure
+
+- `policy.ts`: pure decision logic. No `$`, no state, no imports.
+- `register.ts`: thin event wiring.
+- TypeScript in strict mode.
+- State lives in `$.state` (per session), never in `$.store`.
+
+### Events
+
+| Event           | What the hook does                                                         |
+| --------------- | -------------------------------------------------------------------------- |
+| `session.start` | Reads `MODE_GATE_PROFILES`, sets starting profiles, registers commands.    |
+| `command.run`   | Switches profiles and redraws the band. Registered with `immediate: true`. |
+| `tool.call`     | Denies subagent Bash and protected-path writes.                            |
+| `tool.check`    | Returns the verdict from `decide`.                                         |
+| `ui.render`     | Draws the active profiles in the band and keeps other mods' content.       |
+
+### Repo layout
+
+```text
+claude-mode-gate/
+  .claude-plugin/   plugin.json, marketplace.json
+  hooks/            hooks.json, register.ts, policy.ts
+  types/            index.d.ts
+  tests/
+  docs/             design.md
+  scripts/          check scripts
+```
+
+## Testing
+
+See `CLAUDE.md`, "Testing strategy". Policy tests are table-driven and cover the decision order, chained and substituted Bash, protected paths, fail-closed behaviour and the reset after `/clear`.
+
+## Security model
+
+The rule is that only the user changes profiles, and the mod never makes Claude Code's own verdict weaker than a deny.
+
+| Route                                     | Risk                                          | How it is closed                                                               |
+| ----------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------ |
+| Claude switches a profile itself          | Claude widens its own permissions             | Commands are for the user. The mod registers no tool for switching.            |
+| Claude edits the mod's source or config   | The policy is rewritten                       | Protected-paths deny on Edit and Write.                                        |
+| Claude sets the environment variable      | The profile set changes mid-session           | Not possible: the variable is read once, and a child cannot change its parent. |
+| Claude writes the variable into a profile | The next session starts in the wrong state    | Protected-paths deny on shell profiles. The band shows the state.              |
+| A repo grants itself permissions          | A project file pre-enables profiles           | Starting profiles come only from the user's environment.                       |
+| Another mod submits a prompt as the user  | A skill-declared profile is triggered         | Install only trusted mods.                                                     |
+| Chained or substituted Bash               | `gh issue edit 1 && rm -rf .` passes a prefix | Metacharacters make a prefix rule not match. Prefer typed tools.               |
+| A hook throws or times out                | The hook is skipped and the call runs         | `.catch` on every gating hook returns ask or deny.                             |
+| Auto mode                                 | An allow skips the classifier                 | Out of scope. Profiles do not loosen when the mode is known.                   |
+| Deny rules                                | A mod cannot approve what a deny refuses      | Keep Bash out of deny. Use ask as the baseline.                                |
+| A forgotten profile                       | A standing permission                         | Names in the band, cleared on `/clear`, never restored on resume.              |
+| A subagent asks for more                  | Confused deputy                               | The parent decides, and non-delegable profiles go to the user.                 |
+| Other write routes                        | PowerShell, NotebookEdit, symlinks            | Not closed yet.                                                                |
+
+The mod does not protect against anything a mod or program does outside Claude's tool calls.
+
+## Unverified assumptions
+
+Check each against the mods reference and its TypeScript declarations before building.
+
+| #   | Assumption                                                    | Why it matters                                                           |
+| --- | ------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1   | `tool.check` exposes the tool input, such as the Bash command | Rules cannot look at the command without it.                             |
+| 2   | `tool.call` and `tool.check` carry an agent id                | The subagent rules and per-agent profiles depend on it.                  |
+| 3   | A slash command's text reaches `prompt.submit`                | Needed to tell when a skill-declared profile ends.                       |
+| 4   | The test kit can raise `tool.check` directly                  | Otherwise the verdict hook is tested only through `decide`.              |
+| 5   | Each terminal session has its own copy of module state        | `$.state` is documented as per session. Do not rely on module variables. |
+| 6   | A mod can read the current permission mode                    | Needed to avoid loosening in auto and bypass mode.                       |
+| 7   | A mod can ask Claude Code how it would decide a call          | Needed for "never override a stricter verdict".                          |
+| 8   | Settings files can define environment variables               | Decides which files the protected paths must cover.                      |
+| 9   | Plugins are stored under `~/.claude/plugins/`                 | Decides the protected paths.                                             |
+| 10  | A mod sees a subagent launch and its parameters               | Needed to record the profiles the parent assigns.                        |
+| 11  | Hooks run for `bypassPermissions` agents                      | Otherwise those agents skip the mod entirely.                            |
+| 12  | Hooks run under `claude -p`                                   | Needed for headless runs.                                                |
+| 13  | A mod can draw below the entry box                            | Otherwise the band stays above the prompt.                               |
+| 14  | A command can offer argument completion                       | Decides how profile names are suggested.                                 |
+| 15  | A mod can tell when a skill starts and ends                   | Needed for skill-declared profiles.                                      |
+
+## Later
+
+- Parameterised profiles, for example `issues 123` for one issue only.
+- Profiles that skills and agents declare in their definitions.
+- A typed commit and push tool, so those calls need no Bash.
+- Enforce mode for bypass.
+- Replay refinements and a persistent log with arguments.
+- Official plugin directory listing.
+
+## Open items
+
+- Which rules the baseline holds exactly, including the fixed check commands.
+- Where profiles are defined, and how a project may propose profiles that the user then approves.
+- The licence, the marketplace name and the minimum Claude Code version.
+- Repo setup: ruleset on `main`, Dependabot, CodeQL, action pinning, SECURITY.md contact.
+
+## Prior art
+
+| Project                | What to borrow                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| issue-board            | Match typed tools, not Bash text. Scope to one issue. Refuse sensitive tools in auto mode. |
+| intact-bash-mod        | Never override a stricter verdict. Watch for commands rewritten by other mods.             |
+| Flightdeck             | A decision log with credentials masked. A "what it can reach" README section.              |
+| review-before-edit     | Ask instead of a flat deny. Its list of uncovered write routes.                            |
+| sec-default (built in) | Canonical fail-closed patterns. Not yet read.                                              |
+| cmd-guard              | Sturdier command parsing, if Bash matching grows.                                          |
+| cc-bash-guard          | Policy as data with its own tests.                                                         |
+| mcp-coder              | Governance, CI conventions and the agent-permissions decision record.                      |
+
+## Work plan
+
+1. **Verify.** Check Claude Code version, load a mod once to get the type declarations, check assumptions 1 to 15, read the sec-default source.
+2. **Build.** `policy.ts` with `decide` and tests first, then `register.ts`, then the commands, the band and the log.
+3. **Test.** Policy tables, protected paths, fail-closed, reset after `/clear`, band, CI with `claude plugin validate` and `claude plugin test`.
+4. **Publish.** README with "what it can reach" and "what it allows", SECURITY.md, CHANGELOG, licence, topics, awesome-list submission.
