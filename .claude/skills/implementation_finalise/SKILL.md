@@ -38,9 +38,10 @@ If the task contains "commit message" (case-insensitive):
 
 If any code changes were made during this process:
 
-- Run pylint checks using the MCP server (fix all errors)
-- Run pytest checks using the MCP server (fix all failures)
-- Run mypy checks using the MCP server (fix all type errors)
+- Run `npm run typecheck` (fix all type errors)
+- Run `npm run lint` (fix all errors)
+- Run `npm run test` (fix all failures)
+- Run `npm run check` once at the end — the full gate must pass
 
 ## Output
 

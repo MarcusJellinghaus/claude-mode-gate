@@ -23,6 +23,7 @@
     "check:catch": "node scripts/check-gating-catch.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "audit": "npm audit --audit-level=high",
+    "sleep": "node scripts/sleep.mjs",
     "check": "run-s typecheck lint format:check arch deadcode docs:lint check:manifests check:catch check:docs test:coverage"
   },
   "devDependencies": {

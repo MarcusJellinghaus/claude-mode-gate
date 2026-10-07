@@ -6,7 +6,7 @@ allowed-tools:
   - "Bash(git add *)"
   - "Bash(git commit *)"
   - "Bash(git push *)"
-  - mcp__mcp-tools-py__run_format_code
+  - "Bash(npm run format)"
   - mcp__mcp-workspace__read_file
   - mcp__mcp-workspace__list_directory
   - mcp__mcp-workspace__search_files
@@ -17,7 +17,7 @@ allowed-tools:
 Follow this process to commit and push your changes:
 
 ## 1. Format Code
-Use `mcp__mcp-tools-py__run_format_code` to format all code (black + isort).
+Run `npm run format` to format all code (Prettier).
 
 ## 2. Review Changes
 Use `mcp__mcp-workspace__git` with command `"status"` to check working directory state.

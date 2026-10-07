@@ -6,11 +6,11 @@ allowed-tools:
   - mcp__mcp-workspace__github_issue_view
   - "Bash(mcp-coder gh-tool *)"
   - mcp__mcp-workspace__read_file
-  - mcp__mcp-tools-py__run_format_code
-  - mcp__mcp-tools-py__run_pylint_check
-  - mcp__mcp-tools-py__run_pytest_check
-  - mcp__mcp-tools-py__run_mypy_check
-  - mcp__mcp-tools-py__run_ruff_check
+  - "Bash(npm run format)"
+  - "Bash(npm run lint)"
+  - "Bash(npm run test)"
+  - "Bash(npm run typecheck)"
+  - "Bash(npm run check)"
 ---
 
 # Implement Direct
@@ -47,13 +47,12 @@ If no issue number is provided:
    - Keep changes focused and minimal — only what the issue requires
 
 5. **Run quality checks**
-   - `mcp__mcp-tools-py__run_pylint_check` — fix all issues
-   - `mcp__mcp-tools-py__run_pytest_check` (with `extra_args: ["-n", "auto"]`) — fix all failures
-   - `mcp__mcp-tools-py__run_mypy_check` — fix all issues
-   - `mcp__mcp-tools-py__run_ruff_check` — fix all issues
+   - `npm run typecheck` — fix all issues
+   - `npm run lint` — fix all issues
+   - `npm run test` — fix all failures
 
 6. **Format code**
-   Use `mcp__mcp-tools-py__run_format_code` to format all code (black + isort).
+   Run `npm run format` to format all code (Prettier). Then run `npm run check` — the full gate must pass before the status update.
 
 7. **Update issue status**
    ```bash

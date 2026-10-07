@@ -6,7 +6,7 @@ allowed-tools:
   - mcp__mcp-workspace__git
   - mcp__mcp-workspace__read_file
   - mcp__mcp-workspace__list_directory
-  - mcp__mcp-tools-py__sleep
+  - "Bash(npm run sleep *)"
 ---
 
 # Analyse GitHub Issue
@@ -20,7 +20,7 @@ If no issue number is provided:
 1. Read `.vscodeclaude_status.txt` and extract the issue number from the `Issue #NNN` line
 2. If the file doesn't exist or has no issue number, ask the user
 
-Wait one second using `mcp__mcp-tools-py__sleep` with `seconds: 1`
+Wait one second by running `npm run sleep -- 1`
 
 Fetch the issue using `mcp__mcp-workspace__github_issue_view`.
 

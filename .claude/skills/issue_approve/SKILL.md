@@ -6,7 +6,7 @@ allowed-tools:
   - mcp__mcp-workspace__github_issue_view
   - "Bash(gh issue view *)"
   - "Bash(MSYS_NO_PATHCONV=1 gh issue comment *)"
-  - mcp__mcp-tools-py__sleep
+  - "Bash(npm run sleep *)"
   - mcp__mcp-workspace__read_file
 ---
 
@@ -50,7 +50,7 @@ MSYS_NO_PATHCONV=1 gh issue comment <issue_number> --body "/approve"
 
 This triggers the GitHub Action to promote the issue status (e.g., `status-01:created` → `status-02:awaiting-planning`).
 
-4. **Wait 5 seconds** — call `mcp__mcp-tools-py__sleep` with `sleep_seconds: 5` — to give the
+4. **Wait 5 seconds** — run `npm run sleep -- 5` — to give the
    GitHub Action time to apply the label transition.
 
 5. **Confirm the transition landed.** Re-fetch the issue and compare its status label against

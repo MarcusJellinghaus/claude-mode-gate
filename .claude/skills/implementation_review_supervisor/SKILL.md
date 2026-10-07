@@ -9,11 +9,11 @@ allowed-tools:
   - mcp__mcp-workspace__save_file
   - mcp__mcp-workspace__edit_file
   - mcp__mcp-workspace__list_directory
-  - mcp__mcp-tools-py__run_pylint_check
-  - mcp__mcp-tools-py__run_pytest_check
-  - mcp__mcp-tools-py__run_mypy_check
-  - mcp__mcp-tools-py__run_vulture_check
-  - mcp__mcp-tools-py__run_lint_imports_check
+  - "Bash(npm run lint)"
+  - "Bash(npm run test)"
+  - "Bash(npm run typecheck)"
+  - "Bash(npm run deadcode)"
+  - "Bash(npm run arch)"
 ---
 
 # Automated Implementation Review (Code Review) / using a supervisor agent
@@ -57,7 +57,7 @@ You are a technical lead supervising a software engineer (subagent). You do not 
 5. Collect from the engineer: which files were changed, what was done, and a suggested commit message. Then launch the **commit agent** with this context. The commit agent should verify only the expected files are modified before committing.
 6. Launch the engineer → `/check_branch_status`
 7. **LOOP: If any code was changed this round, you MUST launch a fresh engineer subagent and repeat from step 1.** Only proceed to step 8 when a round produces zero code changes. Do NOT stop or wait for user input between rounds — the loop is automatic.
-8. Run `run_vulture_check` and `run_lint_imports_check` yourself. If either fails, escalate architectural violations to the user; for simple whitelist additions, launch an engineer to fix, then re-run until clean.
+8. Run `npm run deadcode` and `npm run arch` yourself. If either fails, escalate architectural violations to the user; for simple allowlist additions (e.g. in `knip.json`), launch an engineer to fix, then re-run until clean.
 9. Add a `## Final Status` section to the log. Commit and push the log via the **commit agent**.
 10. Launch the engineer → `/check_branch_status` to verify CI, rebase need, and overall readiness. Include the result in the completion message.
 11. Perform any PR-section tasks this skill covers — typically `PR review` or `Code review`. Once done, tick them in `pr_info/TASK_TRACKER.md` and commit via the **commit agent** (separate commit from the log). Leave unrelated tasks like `PR summary` alone.
@@ -73,6 +73,6 @@ You are a technical lead supervising a software engineer (subagent). You do not 
 **Status**: {committed / no changes needed}
 ```
 
-**Subagent instructions:** When launching subagents, **explicitly instruct them to read `.claude/CLAUDE.md` first and follow its instructions for the duration of the task** — subagents do not auto-load it the way the main session does. Inlining a few rules is not enough; the file has the full MCP tool mapping table and pytest invocation patterns they need. Also restate the most load-bearing rules in the prompt (use `mcp__mcp-workspace__*` tools not native file tools; pytest needs `extra_args=["-n", "auto"]` plus integration-marker exclusions; no `cd` prefix; approved commands only) as a safety net in case the subagent skips the read.
+**Subagent instructions:** When launching subagents, **explicitly instruct them to read `CLAUDE.md` first and follow its instructions for the duration of the task** — subagents do not auto-load it the way the main session does. Inlining a few rules is not enough; the file has the full MCP tool mapping table and the list of `npm run` check commands they need. Also restate the most load-bearing rules in the prompt (use `mcp__mcp-workspace__*` tools not native file tools; run `npm run check` before reporting done; no `cd` prefix; approved commands only) as a safety net in case the subagent skips the read.
 
-**Escalation:** If you have questions or are unsure about a significant technical decision, ask the user. For borderline Accept/Skip findings, default to better code quality rather than asking — only escalate when the fix has meaningful scope or risk, not for trivial changes in either direction. Import contract or architecture violations (from `run_lint_imports_check`): escalate to the user — fixes may require moving code between layers.
+**Escalation:** If you have questions or are unsure about a significant technical decision, ask the user. For borderline Accept/Skip findings, default to better code quality rather than asking — only escalate when the fix has meaningful scope or risk, not for trivial changes in either direction. Import contract or architecture violations (from `npm run arch`): escalate to the user — fixes may require moving code between layers.

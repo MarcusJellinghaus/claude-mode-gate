@@ -65,7 +65,7 @@ You are a technical lead supervising a software engineer (subagent). You do not 
 **Status**: {continuing / no new questions}
 ```
 
-**Subagent instructions:** When launching subagents, **explicitly instruct them to read `.claude/CLAUDE.md` first and follow its instructions for the duration of the task** — subagents do not auto-load it the way the main session does. Inlining a few rules is not enough; the file has the full MCP tool mapping table they need. Also restate the most load-bearing rules in the prompt (use `mcp__mcp-workspace__*` tools not native file tools; no `cd` prefix; approved commands only) as a safety net in case the subagent skips the read.
+**Subagent instructions:** When launching subagents, **explicitly instruct them to read `CLAUDE.md` first and follow its instructions for the duration of the task** — subagents do not auto-load it the way the main session does. Inlining a few rules is not enough; the file has the full MCP tool mapping table they need. Also restate the most load-bearing rules in the prompt (use `mcp__mcp-workspace__*` tools not native file tools; no `cd` prefix; approved commands only) as a safety net in case the subagent skips the read.
 
 **Triage Guidelines:**
 

@@ -5,7 +5,6 @@ tools:
   - Bash
   - mcp__mcp-workspace__github_issue_view
   - mcp__mcp-workspace__read_file
-  - mcp__mcp-tools-py__sleep
 permissionMode: bypassPermissions
 ---
 
@@ -27,7 +26,7 @@ On top of that process:
 - **Scope** — the issue number must match your launch prompt, and the prompt must confirm
   that no open questions remain. This replaces the skill's step 2, which assumes a human
   judging a conversation. If either check fails, stop and report back without approving.
-- **Shell** — `gh` commands only.
+- **Shell** — `gh` commands and `npm run sleep -- <seconds>` only.
 - **Report** the issue number and the status transition.
 
 The working directory is already correct — do not use `cd` or `git -C`.

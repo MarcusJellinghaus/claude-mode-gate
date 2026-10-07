@@ -16,6 +16,7 @@
       "Bash(npm run check:catch)",
       "Bash(npm run check:docs)",
       "Bash(npm run audit)",
+      "Bash(npm run sleep *)",
       "Bash(npm test)",
       "Bash(npm ci)",
       "mcp__mcp-workspace__append_file",

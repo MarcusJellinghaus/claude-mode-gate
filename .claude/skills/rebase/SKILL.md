@@ -13,11 +13,11 @@ allowed-tools:
   - "Bash(git restore *)"
   - "Bash(git stash *)"
   - "Bash(git push --force-with-lease *)"
-  - mcp__mcp-tools-py__run_format_code
+  - "Bash(npm run format)"
   - mcp__mcp-workspace__get_base_branch
-  - mcp__mcp-tools-py__run_pylint_check
-  - mcp__mcp-tools-py__run_pytest_check
-  - mcp__mcp-tools-py__run_mypy_check
+  - "Bash(npm run lint)"
+  - "Bash(npm run test)"
+  - "Bash(npm run typecheck)"
   - mcp__mcp-workspace__read_file
   - mcp__mcp-workspace__save_file
   - mcp__mcp-workspace__edit_file
@@ -70,7 +70,7 @@ If the base branch is not `main` or `master`, ask the user to confirm before pro
    - Verify no conflict markers remain
    - `git add <file>`
    - `git rebase --continue`
-4. Run code checks: `mcp__mcp-tools-py__run_pytest_check`, `mcp__mcp-tools-py__run_pylint_check`, `mcp__mcp-tools-py__run_mypy_check`
+4. Run code checks: `npm run test`, `npm run lint`, `npm run typecheck`
 5. Fix any issues from merge
 6. Report summary and ask for user confirmation
 7. `git push --force-with-lease`
@@ -80,7 +80,7 @@ If the base branch is not `main` or `master`, ask the user to confirm before pro
 | File Type | Strategy |
 |-----------|----------|
 | `pr_info/` files | Auto-resolve with `--theirs` (keep feature branch version) |
-| Code files (`.py`, `.js`, etc.) | Keep both sides, merge imports |
+| Code files (`.ts`, `.mjs`, etc.) | Keep both sides, merge imports |
 | Test files | Keep all tests from both sides |
 | Config files | Merge additively, prefer HEAD for same keys |
 | Lockfiles (`*-lock.json`, `*.lock`) | Accept theirs (`--theirs`), notify user to regenerate after rebase |
