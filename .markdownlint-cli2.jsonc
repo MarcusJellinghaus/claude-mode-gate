@@ -1,0 +1,15 @@
+{
+  "config": {
+    "MD013": false,
+    "MD033": false,
+    "MD041": false,
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    ".claude/skills/**",
+    ".claude/agents/**",
+    "node_modules/**",
+    "idea.md",
+    "coverage/**",
+  ],
+}

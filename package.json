@@ -2,11 +2,43 @@
   "name": "claude-mode-gate",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "A Claude Code mod with switchable permission modes: one command changes what Claude may do, and everything outside the active mode still asks.",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:mutation": "stryker run",
+    "arch": "depcruise hooks types tests --config .dependency-cruiser.cjs",
+    "deadcode": "knip",
+    "docs:lint": "markdownlint-cli2",
+    "check:manifests": "node scripts/check-manifests.mjs",
+    "check:catch": "node scripts/check-gating-catch.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
+    "audit": "npm audit --audit-level=high",
+    "check": "run-s typecheck lint format:check arch deadcode docs:lint check:manifests check:catch check:docs test:coverage"
   },
   "devDependencies": {
-    "typescript": "^5.6.0"
+    "@eslint/js": "^9.0.0",
+    "@stryker-mutator/core": "^8.0.0",
+    "@stryker-mutator/vitest-runner": "^8.0.0",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "dependency-cruiser": "^16.0.0",
+    "eslint": "^9.0.0",
+    "knip": "^5.0.0",
+    "markdownlint-cli2": "^0.15.0",
+    "npm-run-all2": "^7.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.0.0"
   }
 }
