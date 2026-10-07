@@ -11,7 +11,7 @@
         "--file-size-limit",
         "750",
         "--reference-project",
-        "name=mcp-coder,path=${USERPROFILE}\\Documents\\VSCC\\mcp_coder_1179,url=https://github.com/MarcusJellinghaus/mcp-coder"
+        "name=mcp-coder,path=${USERPROFILE}\\Documents\\VSCC\\mcp_coder_1179,url=https://github.com/MarcusJellinghaus/mcp_coder"
       ],
       "env": {
         "PYTHONPATH": "${MCP_CODER_VENV_DIR}\\Lib\\"
