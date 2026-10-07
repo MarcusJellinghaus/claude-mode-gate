@@ -4,6 +4,5 @@ coverage/
 reports/
 *.log
 .DS_Store
-
-# Committed on purpose: holds the MCP environment variables for this machine.
-!.claude/settings.local.json
+.claude/settings.local.json
+logs/
