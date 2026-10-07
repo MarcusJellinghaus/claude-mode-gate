@@ -1,0 +1,9 @@
+{
+  "env": {
+    "MCP_CODER_VENV_PATH": "C:\\Jenkins\\environments\\mcp-coder-dev\\.venv\\Scripts",
+    "MCP_CODER_VENV_DIR": "C:\\Jenkins\\environments\\mcp-coder-dev\\.venv",
+    "MCP_CODER_PROJECT_DIR": "C:\\Users\\Marcu\\Documents\\GitHub\\claude-mode-gate",
+    "DISABLE_AUTOUPDATER": "1",
+    "MCP_TIMEOUT": "30000"
+  }
+}
