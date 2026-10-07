@@ -20,7 +20,7 @@ Prefer the `mcp__mcp-workspace__*` tools over native `Read`, `Write`, `Edit`, `G
 
 **Reference project:** `mcp-coder` (local clone at `~/Documents/VSCC/mcp_coder_1179`). It is the model for the skills, agents and launcher scripts copied into this repo. Check it before asking how something is done there.
 
-**Skills and agents** in `.claude/skills` and `.claude/agents` are copied from mcp-coder. The Python tools (`mcp-tools-py`) are replaced by the matching `npm run` scripts: format → `npm run format`, pylint and ruff → `npm run lint`, mypy → `npm run typecheck`, pytest → `npm run test`, vulture → `npm run deadcode`, import-linter → `npm run arch`, sleep → `npm run sleep -- <seconds>`. They still assume mcp-coder's `mcp-coder gh-tool` for issue status and `.claude/knowledge_base/*.md`, which this repo does not have. The three agents run with `bypassPermissions`. Review them before relying on them here.
+**Skills and agents** in `.claude/skills` and `.claude/agents` are copied from mcp-coder. The Python tools (`mcp-tools-py`) are replaced by the matching `npm run` scripts: format → `npm run format`, pylint and ruff → `npm run lint`, mypy → `npm run typecheck`, pytest → `npm run test`, vulture → `npm run deadcode`, import-linter → `npm run arch`. The sleep tool is dropped; the skills no longer wait. They still assume mcp-coder's `mcp-coder gh-tool` for issue status and `.claude/knowledge_base/*.md`, which this repo does not have. The three agents run with `bypassPermissions`. Review them before relying on them here.
 
 Ask questions as plain text in the chat, not with a question tool. Tell me at once if the MCP tools are not available.
 
