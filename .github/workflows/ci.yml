@@ -80,7 +80,12 @@ jobs:
       - name: Link check
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --no-progress --offline --include-fragments "**/*.md"
+          args: >-
+            --no-progress --offline --include-fragments
+            --exclude-path node_modules --exclude-path .claude/skills
+            --exclude-path .claude/agents --exclude-path coverage
+            --exclude-path .stryker-tmp
+            "./*.md"
           fail: true
 
   security:
