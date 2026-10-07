@@ -1,0 +1,5 @@
+{
+  "name": "mode-gate",
+  "version": "0.0.0",
+  "description": "A Claude Code mod with switchable permission modes: one command changes what Claude may do, and everything outside the active mode still asks."
+}
