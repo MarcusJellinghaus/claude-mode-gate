@@ -6,7 +6,14 @@ claude-mode-gate is a Claude Code mod (TypeScript, strict mode) with switchable 
 
 Start Claude with `claude.bat` (Windows) or `claude.sh` (macOS, Linux), not bare `claude`. The launcher finds the `mcp-workspace` install and sets `MCP_CODER_VENV_PATH`, `MCP_CODER_VENV_DIR`, `MCP_CODER_PROJECT_DIR`, `DISABLE_AUTOUPDATER` and `MCP_TIMEOUT`, which `.mcp.json` needs. `.mcp.linux.json` and `.mcp.macos.json` are the platform variants.
 
-Prefer the `mcp__mcp-workspace__*` tools over native `Read`, `Write`, `Edit`, `Glob` and `Grep` for file and git work. Use Bash for `npm run ...` commands, `git commit/add/push/checkout -b`, and anything else with no MCP equivalent.
+**Always use the `mcp__mcp-workspace__*` tools** instead of native `Read`, `Write`, `Edit`, `Glob` and `Grep` for file and git work. Use Bash only for `npm run ...` commands, `git commit/add/push/checkout -b`, `gh` writes with no MCP tool, and anything else with no MCP equivalent.
+
+**Justify Bash.** Before a Bash command, say in chat, on two lines:
+
+- _What it does_ — one sentence.
+- _Why MCP doesn't_ — which tool you would have used, and what stops it.
+
+If you can't name the gap, use the MCP tool. Exempt: the approved `npm run` check commands and `git add/commit/push` for the standing commit-and-push workflow. Subagents follow the same rule.
 
 | Task                            | MCP tool                                                                                              |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
