@@ -35,10 +35,23 @@ Non-goals:
 
 ## Concepts
 
-- **Baseline.** Always-on rules. Reads, undoable project writes through the mcp-workspace tools, and a fixed set of check commands. It also holds the fixed denies (protected paths).
+- **Baseline.** Always-on rules (see below). It also holds the fixed denies (protected paths).
 - **Profile.** A named bundle with a description and three rule lists: `allow`, `ask` and `deny`. The same shape as the `permissions` block in `settings.json`. A profile that only has `deny` entries is a restriction, for example a read-only profile.
 - **Active set.** The baseline plus the profiles that are switched on.
 - **Rule syntax.** Claude Code's: `mcp__server__tool`, `Bash(npm run check)`, `Bash(git commit *)`.
+
+### Baseline
+
+Always on:
+
+- **Reads:** the mcp-workspace read tools (files, directories, search, reference projects, read-only `git`, GitHub reads, `check_*`).
+- **Writes:** `edit_file`, `save_file`, `append_file`, `move_file`, `delete_this_file`, `delete_directory`. Protected paths still deny. Deleting untracked files cannot be undone with git.
+- **Checks:** the exact scripts `npm run check`, `typecheck`, `lint`, `format`, `format:check`, `test`, `test:coverage`, `test:mutation`, `arch`, `deadcode`, `docs:lint`, `check:*` and `audit`. `npm ci` and `npm install` ask, because they run install scripts.
+- **Other tools:** Skill, Agent, web fetch and web search. A fetched URL or a search query can leak data, and fetched pages can carry injected instructions. The baseline accepts this.
+- **Ask:** edits to `package.json`, `scripts/` and the tool configs, because the allowed `npm run` scripts execute them.
+- **Deny:** the protected paths.
+
+Not in the baseline: git writes (`add`, `commit`, `push`, `checkout -b`). A `git-write` profile allows them. All other Bash asks.
 
 ### Decision order
 
@@ -203,7 +216,7 @@ Check each against the mods reference and its TypeScript declarations before bui
 
 ## Open items
 
-- Which rules the baseline holds exactly, including the fixed check commands.
+- The exact rules of the first profiles (`git-write`, `issues`) and which profiles are non-delegable.
 - Where profiles are defined, and how a project may propose profiles that the user then approves.
 - The licence, the marketplace name and the minimum Claude Code version.
 - Repo setup: ruleset on `main`, Dependabot, CodeQL, action pinning, SECURITY.md contact.
