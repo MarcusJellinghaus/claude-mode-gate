@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Workflow actions are pinned to commit SHAs, enforced by `npm run check:pins`.
 - MIT licence, Dependabot config and a real security policy.
 - Initial repo scaffold.
 - Design agreed and recorded in `docs/design.md` (baseline plus switchable profiles).

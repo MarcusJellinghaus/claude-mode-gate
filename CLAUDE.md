@@ -52,6 +52,7 @@ Run everything with `npm run check`. It runs each gate below in order and stops 
 | `npm run docs:lint`       | markdownlint                                               |
 | `npm run check:manifests` | plugin, marketplace and hooks JSON are valid and agree     |
 | `npm run check:catch`     | every gating hook in `register.ts` has a `.catch`          |
+| `npm run check:pins`      | workflow actions are pinned to a full commit SHA           |
 | `npm run check:docs`      | required docs exist (`RELEASE=1` also bans placeholders)   |
 | `npm run test`            | vitest unit tests                                          |
 | `npm run test:coverage`   | unit tests with a 95% threshold on `policy.ts`             |

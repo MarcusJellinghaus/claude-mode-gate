@@ -22,9 +22,10 @@
     "docs:lint": "markdownlint-cli2",
     "check:manifests": "node scripts/check-manifests.mjs",
     "check:catch": "node scripts/check-gating-catch.mjs",
+    "check:pins": "node scripts/check-action-pins.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "audit": "node scripts/audit-gate.mjs",
-    "check": "run-s typecheck lint format:check arch deadcode docs:lint check:manifests check:catch check:docs test:coverage"
+    "check": "run-s typecheck lint format:check arch deadcode docs:lint check:manifests check:catch check:pins check:docs test:coverage"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

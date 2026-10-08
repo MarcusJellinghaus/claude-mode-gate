@@ -21,6 +21,7 @@
       "Bash(npm run docs:lint)",
       "Bash(npm run check:manifests)",
       "Bash(npm run check:catch)",
+      "Bash(npm run check:pins)",
       "Bash(npm run check:docs)",
       "Bash(npm run audit)",
       "Bash(npm test)",
