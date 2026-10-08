@@ -26,6 +26,9 @@
       "Bash(npm run audit)",
       "Bash(npm test)",
       "Bash(npm ci)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
       "mcp__mcp-workspace__append_file",
       "mcp__mcp-workspace__check_branch_status",
       "mcp__mcp-workspace__check_file_size",
@@ -68,6 +71,12 @@
       "Skill(plan_review_supervisor)",
       "Skill(plan_update)",
       "Skill(rebase)"
+    ],
+    "ask": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push * --force)",
+      "Bash(git push * -f)"
     ]
   },
   "enableAllProjectMcpServers": true,

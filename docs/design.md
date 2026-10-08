@@ -236,7 +236,7 @@ Check each against the mods reference and its TypeScript declarations before bui
 
 ## Work plan
 
-1. **Verify.** Check Claude Code version, load a mod once to get the type declarations, check assumptions 1 to 15, read the sec-default source.
+1. **Verify.** Check Claude Code version, read the type declarations Claude Code provides and write a minimal hand-written `types/index.d.ts` from observed shapes, check assumptions 1 to 15 with a small probe mod, read the sec-default source.
 2. **Build.** `policy.ts` with `decide` and tests first, then `register.ts`, then the commands, the band and the log.
 3. **Test.** Policy tables, protected paths, fail-closed, reset after `/clear`, band, CI with `claude plugin validate` and `claude plugin test`.
 4. **Publish.** README with "what it can reach" and "what it allows", SECURITY.md, CHANGELOG, licence, topics, awesome-list submission.

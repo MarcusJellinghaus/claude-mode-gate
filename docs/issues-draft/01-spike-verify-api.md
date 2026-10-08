@@ -2,19 +2,20 @@
 
 ## Context
 
-claude-mode-gate (plugin name `mode-gate`) is a Claude Code mod, written in TypeScript (strict), that gates Claude's tool calls. A mod is a plugin of function hooks that hot-reload in a session. A fixed **baseline** allows reads, a few undoable project writes and the check scripts. Named **profiles** add rules: each has a description and three lists, `allow`, `ask`, `deny`, in Claude Code rule syntax (`mcp__server__tool`, `Bash(npm run check)`, `Bash(git commit *)`). The user switches profiles with `/gate-on <profile>...` and `/gate-off <profile>...|all`, and inspects with `/gate-status`, `/gate-why [n]`, `/gate-check` and `/gate-explain <tool> …`. **Subagents** get the baseline plus profiles their parent assigns. **Headless runs** (`claude -p`) read starting profiles from the environment variable `MODE_GATE_PROFILES`.
+claude-mode-gate (plugin name `mode-gate`) is a Claude Code mod, written in TypeScript (strict), that gates Claude's tool calls. A mod is a plugin of function hooks that hot-reload in a session. A fixed **baseline** plus named **profiles** (rule lists `allow`, `ask`, `deny`) decide each call. The user switches profiles with `/gate-on` and `/gate-off`. **Subagents** get the baseline plus the profiles their parent assigns. **Headless runs** (`claude -p`) read starting profiles from `MODE_GATE_PROFILES`.
 
-The design is agreed in `docs/design.md`, but nothing is built, and 15 facts about the mods API are unverified. This spike is the first step (Draft 01 of 11). Every later draft depends on its result. See Draft 00 for the plan.
+The design is agreed in `docs/design.md`, but nothing is built, and 15 facts about the mods API are unverified. This spike is the first step (Draft 01 of 11). Most later drafts depend on its result. See Draft 00 for the plan. Draft ids refer to the files in docs/issues-draft/ (see 00-overview.md); they become GitHub issue numbers at creation.
 
-## Design decisions this issue relies on
+Constraints the findings must respect:
 
-- Code structure: `hooks/policy.ts` is pure (no `$`, no state, no imports). `hooks/register.ts` is thin wiring. State lives in `$.state` (per session), never `$.store`.
-- Events: `session.start` (reads `MODE_GATE_PROFILES`, registers commands), `command.run` (commands registered `immediate: true`), `tool.call` (denies subagent Bash and protected-path writes), `tool.check` (returns the verdict from `decide`), `ui.render` (draws the band, keeps other mods' content).
-- Decision order, first match wins: (1) a subagent calls Bash and holds no profile with a Bash rule for it: deny with a redirect message; (2) Edit or Write on a protected path: deny; (3) across the active set, deny beats ask beats allow; (4) a call matching nothing keeps Claude Code's own verdict. A deny from Claude Code is never overridden.
+- `hooks/policy.ts` is pure (no `$`, no state, no imports). `hooks/register.ts` is thin wiring. State lives in `$.state` (per session), never `$.store`.
+- Planned events: `session.start`, `command.run` (commands registered `immediate: true`), `tool.call`, `tool.check`, `ui.render`.
+- Decision order, first match wins: (1) a subagent calls Bash and holds no rule for it: deny with a redirect message; (2) Edit or Write on a protected path: deny; (3) across the active set, deny beats ask beats allow; (4) a call matching nothing keeps Claude Code's own verdict. A deny from Claude Code is never overridden.
 - Every gating hook has a `.catch` that fails closed (ask or deny, never allow).
-- Permission modes: auto and bypass are out of scope for v1. If the API shows the mode, profiles do not loosen anything there.
 
 ## The 15 unverified assumptions
+
+`docs/design.md` ("Unverified assumptions") is the source of truth for this table. The copy here keeps the issue self-contained.
 
 | #   | Assumption                                                    | Why it matters                                              |
 | --- | ------------------------------------------------------------- | ----------------------------------------------------------- |
@@ -34,56 +35,139 @@ The design is agreed in `docs/design.md`, but nothing is built, and 15 facts abo
 | 14  | A command can offer argument completion                       | Decides how profile names are suggested                     |
 | 15  | A mod can tell when a skill starts and ends                   | Needed for skill-declared profiles (later)                  |
 
+`docs/design.md` is the source of truth for this table. If it changes, re-sync this table.
+
+Assumption 4 means the plugin test facility: the way to run a mod's hooks in a test and raise `tool.check` by hand. Look for `claude plugin test` and the "Test a mod" docs page (step 2). These names are unverified.
+
+**Bash-only session:** a session whose only way to run Claude Code is `claude -p` from Bash. It has no interactive terminal (TTY).
+
+Each row gets exactly one verification method:
+
+| Method                                             | Rows                    |
+| -------------------------------------------------- | ----------------------- |
+| `claude -p`                                        | 1, 2, 6, 10, 11, 12, 15 |
+| declarations plus a `claude -p "/<command>"` probe | 3                       |
+| declarations                                       | 7                       |
+| docs                                               | 4, 8, 9                 |
+| docs and any declaration                           | 5                       |
+| docs and declarations (no interactive check here)  | 13, 14                  |
+
+A docs or declarations row is `unknown` only if no source states the fact.
+
+Row 7 (declarations only) maps to a status like this:
+
+| Finding in the declarations                           | Status     |
+| ----------------------------------------------------- | ---------- |
+| They expose a complete way to ask for the verdict     | `verified` |
+| They expose an incomplete way                         | `partial`  |
+| They were read and expose no way                      | `failed`   |
+| No source states it (declarations unreadable or mute) | `unknown`  |
+
 ## Existing code
 
-- `types/index.d.ts`: a stub (`export {}`) for `$.state` and mod declarations. This spike fills it.
+- `types/index.d.ts`: only a comment and `export {}`. It declares nothing yet, not even `$.state`. This spike declares `$.state` and every other shape the mod uses.
 - `hooks/register.ts`: wiring stub. `hooks/policy.ts`: only `export type Verdict = "allow" | "ask" | "deny"`. `hooks/hooks.json`: `{}`.
-- `scripts/check-gating-catch.mjs`: scans `hooks/register.ts` for `$.on("event", ...)` registrations and requires `.catch(` on `tool.call`, `tool.check`, `prompt.submit` and `command.run`. Both the `$.on` syntax and the event list are assumptions; update the script if the real API differs.
-- `scripts/check-manifests.mjs` and `.claude-plugin/plugin.json`: manifest checks. `CLAUDE.md`: commands, testing strategy, principles. `docs/design.md`: the design and the assumptions table.
+- `scripts/check-gating-catch.mjs`: scans `hooks/register.ts` for `$.on("event", ...)` registrations and requires `.catch(` on `tool.call`, `tool.check`, `prompt.submit` and `command.run`. Both the `$.on` syntax and the event list are assumptions. It reads the hard-coded path `hooks/register.ts`, has no export and runs `process.exit` at the top level, so it cannot be unit tested as written.
+- `scripts/check-action-pins.mjs`, `scripts/check-action-pins.d.mts` and `tests/check-action-pins.test.ts`: the model for a testable script (exported pure function, typing file, thin main behind an `import.meta.url` guard, test).
+- `scripts/check-manifests.mjs`, `.claude-plugin/plugin.json` and `tests/repo-structure.test.ts`: manifest checks and the structure test that must keep passing.
+- `CLAUDE.md`: commands, testing strategy, principles. `docs/design.md`: the design and the assumptions table.
 
 ## Goal
 
-Replace guesses with facts. Verify each of the 15 assumptions against a real Claude Code, generate real type declarations, and record every design change.
+Replace guesses with facts. Verify each of the 15 assumptions against a real Claude Code, write minimal type declarations from what is observed, and record every design change.
 
 ## Scope
 
-- Check the Claude Code version and note the minimum supported one.
-- Load a minimal probe mod and read the generated declarations.
-- Test at runtime: agent id on `tool.call` and `tool.check` (2); subagent launch visibility (10); hooks under `bypassPermissions` agents (11) and under `claude -p` (12); skill start and end (15); a slot below the entry box (13); command argument completion (14); tool input in `tool.check` (1); permission mode readable (6).
-- Decide the rest (3, 4, 5, 7, 8, 9) from declarations and docs, or by a small probe.
-- Read the built-in sec-default source and note its fail-closed patterns.
-- Update the `docs/design.md` assumptions table and any section that changes.
+- Find the Claude Code documentation for mods and the procedures to load, run and launch (step 2 of "How to start").
+- Load a small probe mod (the prototype) by those procedures and observe the real shapes of events, payloads and declarations.
+- Verify each row by its method in the table above. Probe rows (`claude -p`): tool input in `tool.check` (1); agent id on `tool.call` and `tool.check` (2); permission mode readable (6); subagent launch visibility (10); hooks under `bypassPermissions` agents (11) and under `claude -p` (12); skill start and end (15).
+- Rows that need an interactive terminal cannot be observed in a Bash-only session: slash commands run live, the band (13), argument completion (14), hot-reload and two concurrent sessions. Rows 13 and 14 are read from the docs and declarations. They end `documented` or `verified` if those state the fact, and `unknown` only if nothing does. The Evidence cell gives the source or the reason, and the row states its fallback or why none is needed. Do not block on them; the owner may check them interactively later. The design already has fallbacks: the band stays above the prompt (13), and an unknown profile name returns an error that lists the valid names (14).
+- Row 5 (state per session) is verified from the docs and any declaration. It becomes `unknown` only if neither states it.
+- Row 3 settles whether `prompt.submit` stays in the gating event list. Its methods are the declarations plus a `claude -p "/<command>"` probe.
+- Rows 4, 7, 8 and 9 use their single method (docs for 4, 8 and 9; declarations for 7); none is probed.
+- Read the built-in sec-default source if it is readable and note its fail-closed patterns. Its location is unknown. If the source is not readable, record that and rely on the docs.
+- Propose the minimum supported Claude Code version in `docs/design.md`, marked "proposed". The owner's confirmation is recorded in the PR review.
+- Update `docs/design.md`: add "Status" and "Evidence" columns to the assumptions table and change any section the findings affect. Run `npm run format` after editing tables there, because Prettier and markdownlint check them.
+- Match `hooks/hooks.json` (currently `{}`), `.claude-plugin/plugin.json` and `scripts/check-manifests.mjs` to the real manifest shape, with `tests/repo-structure.test.ts` still passing.
+- Make `scripts/check-gating-catch.mjs` testable, tests first. The script has no export and exits at the top level, so write `tests/check-gating-catch.test.ts` first, importing the not-yet-exported pure function. The tests fail. Then extract the function like `scripts/check-action-pins.mjs` (exported pure function, `.d.mts`, thin main) and the tests pass. The tests pin down the current behaviour: the registration pattern, the event list and the `.catch` check. Adjust the syntax and events afterwards, once the real syntax is known from the docs step.
+- Write `types/index.d.ts` by hand (see Acceptance criteria).
+- Decide the `prompt.submit` question: keep it in the gating list if assumption 3 holds, otherwise remove it from the script and the docs.
 
 ## Out of scope / later
 
-Building any production feature. The probe mod is throw-away.
+Building any production feature beyond the items in Scope. The probe mod is throw-away.
 
 ## If an assumption fails
 
-Write the fallback into `docs/design.md` before any dependent draft starts. Examples: no agent id (2) means subagent profiles (Draft 06) cannot be enforced per agent, so say what is dropped. No hooks under `bypassPermissions` agents (11) means those agents bypass the mod, so Draft 10 must stop using them. No hooks under `claude -p` (12) means headless runs are unsupported.
+Any `failed` or `partial` row gets a fallback written into `docs/design.md`, with an impact note for each affected draft.
+
+Assumptions 1, 6 and 7 are central to the design. Row 7 uses the status mapping in Scope: a complete way is `verified`, an incomplete way is `partial`, declarations read that expose none are `failed`, and no source stating it is `unknown`. If any of the three is `failed`, `partial` or `unknown`, finish observing the other rows (they are independent), then report everything together to the owner (see "Stop and ask" in Working rules). Draft no fallback for 1, 6 or 7 until the owner answers.
+
+Known impacts to start from:
+
+- Assumption 2: subagent profiles (Draft 06) cannot be enforced per agent. Say what is dropped.
+- Assumption 11: `bypassPermissions` agents skip the mod, so Draft 10 must stop using them.
+- Assumption 12: headless runs are unsupported.
+
+If `CLAUDE_CONFIG_DIR` is not supported (step 4), stop and ask. Do not probe against the live config.
 
 ## Acceptance criteria
 
-- [ ] The assumptions table in `docs/design.md` marks each of the 15 as verified or failed, with the Claude Code version used.
-- [ ] Every failed assumption has a documented design change or fallback.
-- [ ] `types/index.d.ts` holds the real declarations and `npm run typecheck` passes.
-- [ ] `scripts/check-gating-catch.mjs` matches the real registration syntax and gating event names.
-- [ ] The minimum Claude Code version is recorded in `docs/design.md`.
-- [ ] The sec-default fail-closed patterns are summarised in `docs/design.md`.
-- [ ] No probe code remains in `hooks/`.
-- [ ] `npm run check` passes.
+- [ ] Every one of the 15 rows in the `docs/design.md` assumptions table has a Status and an Evidence cell. Status is one of:
+  - `verified`: observed at runtime, or stated explicitly in the type declarations.
+  - `documented`: only the docs say so.
+  - `failed`, `partial` or `unknown` otherwise. `unknown` is allowed only for a row whose docs or declarations do not state the fact, or a probe row that could not be observed (see "Scope"). Its Evidence cell gives the reason, and the row states a fallback or why none is needed.
+  - Row 7 follows the mapping in Scope: complete way `verified`, incomplete way `partial`, declarations read and expose none `failed`, no source `unknown`.
+- [ ] Every Evidence cell cites its source: a declaration line, a doc section, or for a runtime-verified row a short quoted excerpt with the date and Claude Code version, secrets redacted. Probe logs are never committed, so the excerpt in `docs/design.md` is the evidence.
+- [ ] Every `failed` or `partial` row has a fallback and an impact note for the affected drafts in `docs/design.md`. If row 1, 6 or 7 is `failed`, `partial` or `unknown`, the owner was told first and no fallback was drafted before that.
+- [ ] `docs/design.md` records the Claude Code version tested, the version the docs say introduced mods, and the minimum supported version, marked "proposed". The owner's confirmation is recorded in the PR review.
+- [ ] `docs/design.md` records what step 2 found: how a mod is loaded and hot-reloaded, how to run `claude` and `claude -p` with it, and how to launch a subagent and a `bypassPermissions` agent.
+- [ ] `docs/design.md` records the real hook and plugin manifest shape. `hooks/hooks.json`, `.claude-plugin/plugin.json` and `scripts/check-manifests.mjs` match it, and `tests/repo-structure.test.ts` passes.
+- [ ] `docs/design.md` summarises the sec-default fail-closed patterns, or states that its source is not readable.
+- [ ] `types/index.d.ts` is a hand-written minimal declaration file. It declares `$.state` and the other shapes the mod uses, written from observed shapes and checked against the installed Claude Code version, which the file states. Claude Code's own declaration file is not copied into the repo. `npm run check` passes with it without new lint, knip or tsconfig exceptions, unless one is recorded next to it with the reason.
+- [ ] `tests/check-gating-catch.test.ts` was written first against the unexported function and failed. `scripts/check-gating-catch.mjs` now exports a pure function, has a `.d.mts` typing file and a thin main, and the tests pass, pinning down the registration pattern, event list and `.catch` check. After the docs step, its registration pattern and event list match the real syntax and gating event names, with tests updated. The `prompt.submit` decision is applied in the script and in `docs/design.md`.
+- [ ] When the spike edits `docs/design.md`, it also refreshes the "Updated" date line at the top, and `npm run format` and `npm run check:docs` still pass.
+- [ ] No probe code, probe file or log is committed. Nothing probe-related remains in `hooks/`.
+- [ ] The spike branches from `main`, so it starts after PR #1 (the initial repo setup) is merged. The work ends with a PR to `main`, and `npm run check` passes.
 
 ## How to start
 
-1. Run `claude --version`. 2. Read the mods reference in the Claude Code docs. 3. Create a probe in the scratchpad (not in `hooks/`), load it, and log the payload of each event to a file. 4. Fill in one table row per probe.
+1. Run `claude --version`. If mods are unavailable in the installed version, stop and ask.
+2. **Find the docs and learn how to load a mod.** The docs location and the load command are not recorded anywhere yet. Do not invent a URL, command or manifest shape. Find them in the Claude Code documentation or the installed Claude Code. These names come from the original brainstorm and are unverified: pages titled "Mods overview", "React to events", "Use the mods API", "Draw in the interface", "Test a mod" and "Mods reference"; the CLI commands `claude plugin validate` and `claude plugin test`; and a minimum Claude Code version of 2.1.287. Learn, and record, how a mod is loaded and hot-reloaded, how to run `claude` and `claude -p` with it, and how to launch a subagent and a `bypassPermissions` agent. Also learn where Claude Code writes its own type declarations when a mod is loaded (step 5 uses them). Later steps and the acceptance criteria refer to this step for the procedures.
+3. Check that PR #1 is merged. Run `git fetch` and `git pull --ff-only` on `main`, then create the branch `spike/verify-api` from it (not from `feature/initial-repo-setup`).
+4. Create the probe in a temporary directory outside the repo, not in `hooks/`: the session scratchpad directory if the session's instructions list one, otherwise an OS temp directory. Load it the way step 2 found. The mcp-workspace write tools reach only the project directory, so use the native Write tool for probe files and Bash to run them, in that directory only (the exception in Working rules). Log the payload of each event to a file outside git. Run the probe with bare `claude`, not `claude.bat` (the repo launcher), with `CLAUDE_CONFIG_DIR` set to an isolated directory in the same command, so it cannot gate or disturb a live session. Check which shell is available on Windows (Git Bash or PowerShell) and use its syntax to set the variable. Verify first that the variable is supported; if not, stop and ask. The isolated directory may have no login. If the probe `claude` cannot authenticate, stop and ask. Do not use the live config, and do not set an API key on your own.
+
+   Choose the permission flags for `claude -p` probes from `claude --help` (permission mode, allowed tools), so the probe's tool calls do not stall on permission prompts. The exact flag names are unverified: read them from `claude --help`. Run row 6 (reading the current permission mode) once under each permission mode the CLI offers. Use bypass-style flags only inside the isolated `CLAUDE_CONFIG_DIR` and only for the probe.
+
+5. **Read Claude Code's type declarations.** Claude Code writes its own declarations when a mod is loaded; the location comes from step 2. Read them to mark rows `verified` by declaration, and to write the minimal hand-written `types/index.d.ts`. Do not copy the file into the repo.
+6. Refactor `scripts/check-gating-catch.mjs` like `scripts/check-action-pins.mjs`. Read `scripts/check-action-pins.mjs`, `scripts/check-action-pins.d.mts` and `tests/check-action-pins.test.ts` first to confirm the pattern. The script has no export and exits at the top level, so it cannot be tested as it stands. Write `tests/check-gating-catch.test.ts` first, importing the not-yet-exported pure function, and see it fail. Then extract the function, add a `.d.mts` typing file and leave a thin main; the tests pass. They pin down the current behaviour (registration pattern, event list, `.catch` check). Keep knip and lint green. Once the real syntax and events are known from step 2, adjust the registration pattern and event list, with the tests first.
+7. Fill in one table row per assumption, citing the evidence. Redact secrets from every excerpt.
 
 ## Working rules
 
-TDD where code exists, KISS, clean code, concise writing. Use the mcp-workspace MCP tools for file and git work; Bash only for `npm run ...` and git add, commit and push. Commit and push to a feature branch after each major change, and run `npm run check` first.
+TDD where code exists, KISS, clean code, concise writing. Use the mcp-workspace MCP tools for file and git work. Bash is allowed only for:
+
+- `npm run ...`;
+- `git add`, `git commit`, `git push` and `git checkout -b`;
+- `git fetch` and `git pull --ff-only` on `main`, to start from an up-to-date `main`;
+- running Claude Code itself (`claude --version`, `claude`, `claude -p`, launching subagents) and the probe.
+
+Exception, because no MCP tool exists for it: the native Write tool and Bash may create and run probe files in the temp directory outside the repo, and only there.
+
+Nothing else.
+
+**Stop and ask** (used throughout this issue) means: report to the owner in the session chat if an owner is attached, otherwise comment on the GitHub issue. List what is done and what is blocked. If the branch exists, leave the work uncommitted on it; if no branch exists yet, just report, as there is nothing to leave uncommitted.
+
+Commit and push to the `spike/verify-api` branch after each major change, and run `npm run check` first. Keep probe files and logs out of git.
 
 ## Depends on
 
-none
+none (starts after PR #1 is merged to `main`)
+
+## Open questions
+
+- The docs location, the mod load command and the location of the sec-default source are unknown (step 2).
+- `prompt.submit` is a gating event in the script but not in the design's Events table. The spike settles it (see Scope).
 
 ## References
 

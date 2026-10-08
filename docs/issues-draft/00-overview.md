@@ -52,19 +52,19 @@ In v1: baseline, profiles, the commands, guards, subagent profiles, band, log, e
 
 ## Children
 
-| Draft | Title                                         | Purpose                                              |
-| ----- | --------------------------------------------- | ---------------------------------------------------- |
-| 01    | Spike: verify the Claude Code API             | Check the 15 assumptions, generate type declarations |
-| 02    | Config schema, loader and validator           | Profile data, `MODE_GATE_PROFILES`, `/gate-check`    |
-| 03    | Policy: pure decide() function                | The decision logic and its strict tests              |
-| 04    | Wiring and /gate-on, /gate-off, /gate-status  | Hooks, session state, fail-closed                    |
-| 05    | Guards: protected paths and the Bash redirect | Deny the mod's own files, steer Bash to MCP tools    |
-| 06    | Subagent profiles                             | Delegation by agent id                               |
-| 07    | Band, /gate-why and decision log              | Visibility                                           |
-| 08    | /gate-explain and offline replay              | Dry run and transcript replay                        |
-| 09    | First profiles and README                     | `git-write`, `issues`, "what it can reach" docs      |
-| 10    | Housekeeping: skills, agents and plugin CI    | Adapt copied files, add `claude plugin` checks       |
-| 11    | Post-merge repo setup: rulesets and CodeQL    | Protect `main`, code scanning                        |
+| Draft | Title                                         | Purpose                                                                                                       |
+| ----- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 01    | Spike: verify the Claude Code API             | Check the 15 assumptions, write type declarations, fix manifest and hook shape, refactor `check-gating-catch` |
+| 02    | Config schema, loader and validator           | Profile data, `MODE_GATE_PROFILES`, `/gate-check`                                                             |
+| 03    | Policy: pure decide() function                | The decision logic and its strict tests                                                                       |
+| 04    | Wiring and /gate-on, /gate-off, /gate-status  | Hooks, session state, fail-closed                                                                             |
+| 05    | Guards: protected paths and the Bash redirect | Deny the mod's own files, steer Bash to MCP tools                                                             |
+| 06    | Subagent profiles                             | Delegation by agent id                                                                                        |
+| 07    | Band, /gate-why and decision log              | Visibility                                                                                                    |
+| 08    | /gate-explain and offline replay              | Dry run and transcript replay                                                                                 |
+| 09    | First profiles and README                     | `git-write`, `issues`, "what it can reach" docs                                                               |
+| 10    | Housekeeping: skills, agents and plugin CI    | Adapt copied files, add `claude plugin` checks                                                                |
+| 11    | Post-merge repo setup: rulesets and CodeQL    | Protect `main`, code scanning                                                                                 |
 
 ## Acceptance criteria
 
@@ -82,7 +82,7 @@ In v1: baseline, profiles, the commands, guards, subagent profiles, band, log, e
 
 ## Order of work
 
-Draft 01 first. Drafts 02 and 03 can then run in parallel. Draft 04 needs both. Drafts 05, 06 and 08 need 03 and 04 (08 also 02). Draft 07 needs 04 and 05. Draft 09 needs 02 to 05. Draft 10 can start after 01; replacing the agents with profiles waits for 06 and 09. Draft 11 waits for the merge of PR #1.
+All issue work starts after PR #1 is merged to `main`. Draft 01 first. Drafts 02 and 03 can then run in parallel. Draft 04 needs both. Drafts 05, 06 and 08 need 03 and 04 (08 also 02). Draft 07 needs 04 and 05. Draft 09 needs 02 to 05. Draft 10 can start after 01; replacing the agents with profiles waits for 06 and 09. Draft 11 waits for the merge of PR #1.
 
 ## Scope
 
