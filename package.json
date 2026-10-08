@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "description": "A Claude Code mod with switchable permission profiles: a safe baseline, named profiles you switch on and off, and everything else still asks.",
   "engines": {
     "node": ">=22.12"

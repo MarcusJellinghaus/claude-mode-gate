@@ -218,8 +218,8 @@ Check each against the mods reference and its TypeScript declarations before bui
 
 - The exact rules of the first profiles (`git-write`, `issues`) and which profiles are non-delegable.
 - Where profiles are defined, and how a project may propose profiles that the user then approves.
-- The licence, the marketplace name and the minimum Claude Code version.
-- Repo setup: ruleset on `main`, Dependabot, CodeQL, action pinning, SECURITY.md contact.
+- The marketplace name and the minimum Claude Code version.
+- Repo setup: apply the ruleset on `main` (PR and CI required, admins included), CodeQL, action pinning.
 
 ## Prior art
 

@@ -99,4 +99,4 @@ Enforced by `npm run arch` and `tests/repo-structure.test.ts`.
 
 - Work on a feature branch. Commit and push after each major change.
 - Run `npm run check` before committing. CI runs the same gates, plus the Windows matrix, link check, secret scan and mutation tests.
-- Do not add a LICENSE or pick the marketplace name without asking. Both are open items in `docs/design.md`.
+- Do not pick the marketplace name without asking. It is an open item in `docs/design.md`. The licence is MIT.

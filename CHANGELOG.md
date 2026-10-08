@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- MIT licence, Dependabot config and a real security policy.
 - Initial repo scaffold.
 - Design agreed and recorded in `docs/design.md` (baseline plus switchable profiles).
 - Test and CI tooling: strict type check, ESLint, Prettier, dependency-cruiser, knip, markdownlint, vitest with coverage, Stryker, GitHub Actions.
