@@ -87,7 +87,7 @@ The path guards are extra sources fed into this order, not overrides: a protecte
 - Bash rules are exact or prefix rules in Claude Code's syntax. Allow rules are strict: exact equality or `startsWith`, and never a match if the command contains any of `& ; | $ ( ) \` < >` or a newline. Anything unusual asks.
 - Deny and ask rules always use a boundary-checked substring test, with or without metacharacters. The rule text (prefix with trailing whitespace trimmed, or the exact command text) must appear in the command after the start, whitespace or a metacharacter, and before whitespace, a metacharacter or the end. Every occurrence is tested, and one valid occurrence is enough. The end test is skipped only for prefix rules whose trimmed prefix ends in a colon, as in `npm run check:`; exact rules always need it. An empty prefix always matches. So `deny Bash(git push *)` fires on `git push`, `git push<TAB>origin`, `x;git push`, `git push&&y` and `xgit push; git push`, but not on `git pushd`; `deny Bash(rm -rf /)` fires on `rm -rf / b` and `a; rm -rf /`, but not on `rm -rf /tmp`. A plain `startsWith("git push ")` would miss the bare forms and make the deny inert.
 - When Claude Code's own verdict is unavailable (assumption 7), `decide` treats it as `ask`.
-- The redirect text of the step-1 deny comes from `redirectHint` in `hooks/guards.ts`; `register.ts` adds it to the hook result, `decide` does not build it.
+- The redirect text of the step-1 deny comes from `redirectHint` in `hooks/guards.ts`; `gate.ts` adds it to the hook result, `decide` does not build it.
 - A whole-tool `Bash` rule matches every Bash call.
 - Issue and GitHub work uses the typed mcp-workspace tools, not Bash text.
 
@@ -102,7 +102,7 @@ The path guards are extra sources fed into this order, not overrides: a protecte
 | `/gate-check`            | Validate the config: conflicts, unknown tools, over-broad rules. Also lists project proposals. |
 | `/gate-explain <tool> …` | Dry run one call and show the verdict and the rule chain.                                      |
 
-Replay runs offline as a command-line tool. It reads a Claude Code session transcript and reports what each call would have been under a given config.
+Replay runs offline as a command-line tool (`npm run replay -- <transcript.jsonl>`). It reads a Claude Code session transcript and reports what each call would have been under a given config and a given set of profiles. Claude Code's own verdict is unavailable in replay and in `/gate-explain`, so an unmatched call shows `ask` (`bash-downgrade` or `default`), flagged as an approximation. A `deny` is exact only for a main-session, non-headless call. Every result for a sidechain call, for `--agent`, or converted by the headless rule is flagged as an approximation, whatever its verdict (a real assignment could allow the call). Every non-deny result from a rule, guard, `bash-downgrade` or `malformed` is also shown with "unless Claude Code denies". Replay counts both `Agent` and the older `Task` as Agent calls and gives a sidechain call the entry's `agentId`, else `sidechain`.
 
 Only the user switches profiles. The mod registers no tool that Claude could call to switch.
 
@@ -116,15 +116,15 @@ Only the user switches profiles. The mod registers no tool that Claude could cal
 ## Subagents
 
 - A subagent gets the baseline plus the profiles its parent assigns at spawn. Allow rules come only from those; restrictions are inherited (below).
-- The parent assigns profiles in the prompt of its Agent tool call. The first line is `mode-gate-profiles: name1, name2`. An absent or empty marker means baseline only. The mod reads it from the Agent call input (assumption 10).
+- The parent assigns profiles in the prompt of its Agent tool call. The first line is `mode-gate-profiles: name1, name2`. An absent or empty marker means baseline only. The mod reads it from the Agent call input (assumption 10) with one pure function, `parseAssignmentMarker(prompt)` in `hooks/assignment.ts`, shared by the live wiring, `/gate-explain` and replay.
 - **Matching a launch to the new agent.** The key is the Agent call's `toolCallId`. The mod keeps a pending assignment record under that id and binds it to the subagent's agent id on the event that carries the new id (assumption 10). Matching by arrival order or "the only pending record" is forbidden. If the id-bearing event carries no `toolCallId` (or other linking value), or there is no id-bearing event, there is no binding and the subagent gets the baseline only. Parallel spawns therefore cannot swap assignments. At bind time the assignment is intersected with the parent's currently held set; `/gate-off` and `/clear` also clear pending records.
-- **Writing the record.** For any Agent call that is not denied, once, idempotently by `toolCallId`, only on the live decision path. The record stores the calling agent's id (`main` for the main session), so binding knows whose held set to intersect with. A `tool.call` hook never sees an allow, so whichever live hook first sees the call and returns a non-deny verdict writes it. A dry run (`/gate-explain`) never writes it, and neither does an Agent call that was denied or rejected as an invalid assignment.
+- **Writing the record.** For any Agent call that is not denied, once, idempotently by `toolCallId`, only on the live decision path. The record stores the calling agent's id (`main` for the main session), so binding knows whose held set to intersect with. A `tool.call` hook never sees an allow, so whichever live hook first sees the call and returns a non-deny verdict writes it. The write lives in `register.ts`, after the shared path returns a non-deny verdict for an Agent call (`Agent` or `Task`); `gate.ts` has no injection point for it, so a dry run (`/gate-explain`) and replay never write it. Neither does an Agent call that was denied or rejected as an invalid assignment.
 - The parent can assign only profiles it holds, so authority only narrows down the tree. The chain ends at the user. Nested agents can only narrow.
 - **Restrictions are inherited, allows are not.** The `deny` and `ask` lists of the main session's active profiles also apply to every subagent (deny beats ask beats allow as usual); `allow` lists apply to a subagent only when assigned. So a deny-only profile in the main session, such as a read-only profile, cannot be escaped by launching a subagent. A subagent's effective set is the baseline, its assigned profiles' rules, and the main session's active profiles' deny and ask lists.
 - The parent writes the advice to use only the assigned profiles into the spawn prompt itself; the mod adds nothing to the prompt. That is advice; the mod enforces the same list.
 - An Agent call whose marker names a profile the parent does not hold, or one that is not delegable or unknown, is denied. The deny is a guard result (`source` `guard`) from the pure function `checkAssignment(requested, held, profiles)` in `hooks/assignment.ts`, which returns the offending names; `register.ts` wires it as a closure over `$.state`. The message names the profiles and who decides: the parent for a profile it does not hold, the user (via `/gate-on` in the main session) for a non-delegable one.
 - A subagent with no assignment record (unknown agent id, wiped state, no marker, no binding) gets the baseline only, plus the inherited deny and ask lists.
-- A denied subagent call (also in a headless run) returns this message, not the list of all switched-off profiles that a main-session call gets. It names the delegable profiles that would allow it and that the parent holds, or for a non-delegable one, telling the subagent to ask the user to run `/gate-on <name>`. The subagent stops and reports. The parent decides, and profiles marked non-delegable go to the user. There is no request tool.
+- A denied subagent call (also in a headless run) returns this message, built by the `profileHint(decision, call)` function that `gate.ts` takes by injection (so `/gate-explain` and replay show it too), not by `register.ts` afterwards. It is not the list of all switched-off profiles that a main-session call gets. It names the delegable profiles that would allow it and that the parent holds, or for a non-delegable one, telling the subagent to ask the user to run `/gate-on <name>`. The subagent stops and reports. The parent decides, and profiles marked non-delegable go to the user. There is no request tool.
 - Switching a profile off removes it from all descendants (children and grandchildren). Assignments are cleared on `/clear` and on `session.start`. Switching the profile on again does not bring delegated copies back.
 - Limit: the subagent-Bash deny (decision step 1) covers Bash only. An unmatched non-Bash call keeps Claude Code's verdict, which is allow in a `bypassPermissions` agent. What holds: the allow rules of profiles that were not assigned never apply to a subagent, and the main session's deny and ask lists always do.
 - Fallbacks: without assumption 2 the subagent-Bash deny is inert and every call counts as main-session; without assumption 10 no assignment is possible, so subagents get the baseline only; without assumption 11 the mod cannot gate `bypassPermissions` agents, so work stops until the owner decides.
@@ -170,7 +170,9 @@ Every gating hook has a `.catch` handler that fails closed (never allow): `tool.
 ## Code structure
 
 - `policy.ts`: pure decision logic. No `$`, no state, no imports.
-- `register.ts`: thin event wiring.
+- `gate.ts`: the shared decide path used by `tool.call`, `tool.check` and replay. It imports `policy.ts` and takes the effective set (a function of the call), guards, `redirectHint`, `profileHint(decision, call)` (the subagent denial's profile text, built from the effective set and the held profiles), `log`, the `headless` flag and Claude Code's verdict source by injection. It uses no `$` and does no I/O. The live wiring, `/gate-explain` and replay inject the same functions, so they show the same denial text. Only explain and replay pass `withChain`; the live hooks never build the rule chain. The effective set comes from a pure helper in `assignment.ts` (baseline, profiles, active, optional assignment); the live closure over `$.state` wraps it, and explain and replay call it with explicit lists.
+- `explain.ts`: pure text of a decision and its chain, with the exactness notes. `/gate-explain` and replay both import it, so their output cannot drift. It imports only types from `policy.ts` and the decision type, and sits under the same coverage, mutation and purity gates as `guards.ts`.
+- `register.ts`: thin event wiring. The only importer of host APIs; it wires the real dependencies into `gate.ts`.
 - TypeScript in strict mode.
 - State lives in `$.state` (per session), never in `$.store`, all under one key `gate`: `config`, `active` (profile names in switch-on order), `sessionId`, `logFailing`, `seenIds`, `assignments` and `pending`.
 
@@ -189,11 +191,11 @@ Every gating hook has a `.catch` handler that fails closed (never allow): `tool.
 ```text
 claude-mode-gate/
   .claude-plugin/   plugin.json, marketplace.json
-  hooks/            hooks.json, register.ts, policy.ts
+  hooks/            hooks.json, register.ts, gate.ts, policy.ts, explain.ts
   types/            index.d.ts
-  tests/
+  tests/            unit tests, fixtures/
   docs/             design.md
-  scripts/          check scripts
+  scripts/          check scripts, replay.ts
 ```
 
 ## Testing

@@ -22,7 +22,7 @@ Subagents get the baseline plus the profiles their parent assigns. Headless runs
 - **Rule syntax.** Claude Code's: `mcp__server__tool`, `Bash(npm run check)`, `Bash(git commit *)`. Version 1 matches MCP tools by whole-tool name and Bash by prefix rules. Matching MCP tools by argument comes later, with parameterised profiles.
 - **Bash metacharacter rule.** A Bash rule matches only if the command contains none of `& ; | $ ( ) \` < >` and no newline. Anything unusual asks.
 - **Decision order.** The first match wins: (1) a subagent calls Bash and no active allow rule matches this call: deny with the redirect message; (2) Edit or Write on a protected path: deny; (3) across the active set, deny beats ask beats allow; (4) a call matching nothing keeps Claude Code's own verdict. A deny from Claude Code is never overridden. An allow from Claude Code is downgraded to ask for Bash unless an active rule allows the call.
-- **Commands.** `/gate-on <profile>...`, `/gate-off <profile>...` (`all` switches every profile off), `/gate-status`, `/gate-why [n]` (last n verdicts with rule and profile), `/gate-check` (validate config), `/gate-explain <tool> …` (dry run). `/gate-status` shows the baseline summary, active profiles and the config path. Draft 04 registers all but `/gate-why` (Draft 07) and `/gate-explain` (Draft 08). Replay is an offline command-line tool over a session transcript. Only the user switches profiles; the mod registers no tool Claude could call to switch.
+- **Commands.** `/gate-on <profile>...`, `/gate-off <profile>...` (`all` switches every profile off), `/gate-status`, `/gate-why [n]` (last n verdicts with rule and profile), `/gate-check` (validate config), `/gate-explain <tool> …` (dry run). `/gate-status` shows the baseline summary, active profiles and the config path. Draft 04 registers all but `/gate-why` (Draft 07) and `/gate-explain` (Draft 08). Replay is an offline command-line tool over a session transcript (`npm run replay`, Draft 08). Only the user switches profiles; the mod registers no tool Claude could call to switch.
 - **Lifetimes.** A profile the user switches on lasts the session. A profile a skill declares lasts until the next prompt (later feature). Profiles are cleared on `/clear` and never restored on resume (profiles from an earlier session do not come back). The band shows profile names.
 - **Subagents.** A subagent gets the baseline plus the profiles its parent assigns at spawn. The parent can assign only profiles it holds. A denial names the profile needed; the subagent stops and reports; non-delegable profiles go to the user. Revoking a profile removes copies delegated from it.
 - **Headless.** Starting profiles come from `MODE_GATE_PROFILES` (for example `issues,git-write`), read once per process (every new process, including `claude --resume`). A repo cannot set it. Profiles cannot change during a run. A call that would ask is denied, with a message naming the available profiles that would allow it (or a generic message), when the session is detectably headless; otherwise the mod returns `ask` and Claude Code resolves it.
@@ -35,7 +35,8 @@ Subagents get the baseline plus the profiles their parent assigns. Headless runs
 ## Architecture and file map
 
 - `hooks/policy.ts`: pure decision logic. Imports nothing, uses no `$`, no state, no I/O. Today it holds only the `Verdict` type (`allow`, `ask`, `deny`).
-- `hooks/register.ts`: thin event wiring that calls `policy.ts`. A stub today. Nothing may import it. Events: `session.start`, `command.run` (commands registered `immediate: true`), `tool.call`, `tool.check`, `ui.render`.
+- `hooks/gate.ts`: the shared decision path (Draft 04). Imports `policy.ts`, uses no `$` and no I/O, and takes guards, `redirectHint`, `log`, the `headless` flag and Claude Code's verdict source by injection. Used by `register.ts` and by the replay tool (Draft 08). Does not exist yet.
+- `hooks/register.ts`: thin event wiring that builds the dependencies and calls `gate.ts`. The only importer of host APIs. A stub today. Nothing may import it. Events: `session.start`, `command.run` (commands registered `immediate: true`), `tool.call`, `tool.check`, `ui.render`.
 - `hooks/hooks.json`: hook manifest, `{}` today. `types/index.d.ts`: mod type declarations, a stub until Draft 01.
 - `tests/`: vitest. Today `repo-structure.test.ts`, `audit-gate.test.ts`, `check-action-pins.test.ts`.
 - `scripts/`: `check-manifests`, `check-gating-catch`, `check-docs`, `check-action-pins`, `audit-gate`.
@@ -82,7 +83,7 @@ In v1: baseline, profiles, the commands, guards, subagent profiles, band, log, e
 
 ## Order of work
 
-All issue work starts after PR #1 is merged to `main`. Draft 01 first. Drafts 02 and 03 can then run in parallel. Draft 04 needs both. Drafts 05, 06 and 08 need 03 and 04 (08 also 02). Draft 07 needs 04 and 05. Draft 09 needs 02 to 05. Draft 10 can start after 01; replacing the agents with profiles waits for 06 and 09. Draft 11 waits for the merge of PR #1.
+All issue work starts after PR #1 is merged to `main`. Draft 01 first. Drafts 02 and 03 can then run in parallel. Draft 04 needs both. Drafts 05 and 06 need 03 and 04. Draft 08 needs 02, 03, 04, 05 and 06 (the subagent effective set and `checkAssignment`). Draft 07 needs 04 and 05; 07 and 08 are otherwise independent. Draft 09 needs 02 to 05. Draft 10 can start after 01; replacing the agents with profiles waits for 06 and 09. Draft 11 waits for the merge of PR #1.
 
 ## Scope
 
