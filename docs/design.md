@@ -77,12 +77,18 @@ The first rule that matches wins:
 3. Across the active set, deny beats ask beats allow.
 4. A call that matches nothing keeps Claude Code's own verdict.
 
-A deny from Claude Code is never overridden. An allow from Claude Code is downgraded to ask for Bash unless an active rule allows the call.
+A deny from Claude Code is never overridden. An allow from Claude Code is downgraded to ask for Bash unless an active rule allows the call. "Holds no rule" in step 1 means that no active allow rule matches the call.
+
+The path guards are extra sources fed into this order, not overrides: a protected-path deny is a step-2 deny, and the ask-path guard is an ask source at step 3, so a profile deny still wins over it. A guard never turns a deny into an ask or an allow.
 
 ### Matching
 
 - Tools match by name and, later, by argument. Version 1 uses whole-tool rules only.
-- Bash rules are prefix rules in Claude Code's syntax. A Bash rule matches only if the command contains none of `& ; | $ ( ) \` < >` or a newline. Anything unusual asks.
+- Bash rules are exact or prefix rules in Claude Code's syntax. Allow rules are strict: exact equality or `startsWith`, and never a match if the command contains any of `& ; | $ ( ) \` < >` or a newline. Anything unusual asks.
+- Deny and ask rules always use a boundary-checked substring test, with or without metacharacters. The rule text (prefix with trailing whitespace trimmed, or the exact command text) must appear in the command after the start, whitespace or a metacharacter, and before whitespace, a metacharacter or the end. Every occurrence is tested, and one valid occurrence is enough. The end test is skipped only for prefix rules whose trimmed prefix ends in a colon, as in `npm run check:`; exact rules always need it. An empty prefix always matches. So `deny Bash(git push *)` fires on `git push`, `git push<TAB>origin`, `x;git push`, `git push&&y` and `xgit push; git push`, but not on `git pushd`; `deny Bash(rm -rf /)` fires on `rm -rf / b` and `a; rm -rf /`, but not on `rm -rf /tmp`. A plain `startsWith("git push ")` would miss the bare forms and make the deny inert.
+- When Claude Code's own verdict is unavailable (assumption 7), `decide` treats it as `ask`.
+- The redirect text of the step-1 deny comes from `redirectHint` in `hooks/guards.ts`; `register.ts` adds it to the hook result, `decide` does not build it.
+- A whole-tool `Bash` rule matches every Bash call.
 - Issue and GitHub work uses the typed mcp-workspace tools, not Bash text.
 
 ## Commands

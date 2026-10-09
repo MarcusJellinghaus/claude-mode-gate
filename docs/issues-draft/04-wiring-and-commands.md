@@ -8,7 +8,7 @@ This is Draft 04 of 11 (plan: Draft 00). It connects the pure logic of Drafts 02
 
 ## Design decisions this issue relies on
 
-- Events and what each hook does: `session.start` reads `MODE_GATE_PROFILES`, sets starting profiles and registers commands. `command.run` switches profiles and redraws the band, registered with `immediate: true`. `tool.call` denies subagent Bash and protected-path writes (Draft 05). `tool.check` returns the verdict from `decide`. `ui.render` draws the band (Draft 07).
+- Events and what each hook does: `session.start` reads `MODE_GATE_PROFILES`, sets starting profiles and registers commands. `command.run` switches profiles and redraws the band, registered with `immediate: true`. `tool.call` denies subagent Bash and protected-path writes (Draft 05). `tool.check` returns the verdict from `decide`; when `decide` reports `source` = the subagent-Bash rule, it also calls `redirectHint(command)` (Draft 05, `hooks/guards.ts`) and puts the text in the result's `message`. `ui.render` draws the band (Draft 07).
 - Commands: `/gate-on <profile>...` switches profiles on and prints a short summary of what they allow. `/gate-off <profile>...` switches them off; `all` switches every profile off. `/gate-status` shows the baseline, active profiles and the files they came from.
 - Only the user switches profiles. The mod registers no tool Claude could call to switch.
 - Lifetimes: a profile switched on lasts the session. Profiles are cleared on `/clear` and never restored on resume. The band shows names so a forgotten profile stays visible.

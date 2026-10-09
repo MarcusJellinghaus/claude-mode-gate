@@ -4,17 +4,19 @@
 
 claude-mode-gate (plugin name `mode-gate`) is a Claude Code mod, written in TypeScript (strict), that gates Claude's tool calls. A fixed **baseline** allows reads, a few undoable project writes and the check scripts. Named **profiles** add rules, each with `allow`, `ask` and `deny` lists in Claude Code rule syntax. The user switches profiles with `/gate-on` and `/gate-off`, and inspects with `/gate-status`, `/gate-why`, `/gate-check` and `/gate-explain`. **Subagents** get the baseline plus assigned profiles. **Headless runs** use `MODE_GATE_PROFILES`.
 
-This is Draft 05 of 11 (plan: Draft 00). The rule that makes the whole mod trustworthy is that Claude cannot rewrite the policy. This issue supplies the data for steps 1 and 2 of the decision order and the hook that applies it.
+This is Draft 05 of 11 (plan: Draft 00). The rule that makes the whole mod trustworthy is that Claude cannot rewrite the policy. This issue supplies the guard data that `decide` (Draft 03) takes as input, and the hook that applies it.
 
 ## Design decisions this issue relies on
 
-**Decision order** (first match wins): (1) a subagent calls Bash and holds no profile with a Bash rule for it: deny, with the redirect message; (2) Edit or Write targets a protected path: deny; (3) across the active set, deny beats ask beats allow; (4) unmatched calls keep Claude Code's verdict. A Claude Code deny is never overridden.
+**Decision order** (first match wins): (1) a subagent calls Bash and no active allow rule matches this call: deny, with the redirect message; (2) Edit or Write targets a protected path: deny; (3) across the active set, deny beats ask beats allow; (4) unmatched calls keep Claude Code's verdict. A Claude Code deny is never overridden. Guards compose with the rules and never override them: the protected-path deny is a step-2 deny, the ask-path guard is an ask source at step 3, and a guard never turns a deny into an ask or an allow.
+
+**Guard results.** The guards are pure functions in a new module `hooks/guards.ts` (this issue owns it). `register.ts` calls them with the tool call. Each returns `{ kind: 'deny' | 'ask', message: string }`, or nothing. `register.ts` passes the results to `decide` (Draft 03), which orders them against the rules and passes the `message` through. This draft computes the paths and messages; `decide` does not.
 
 **Protected paths.** Deny Edit and Write on: the mod's config and source, `settings*.json`, hooks, shell profiles and the log folder (configurable, default `logs`). Ask for the rest of `.claude/` (skills, agents). Known gap, not closed in v1: other write routes (PowerShell, NotebookEdit, MCP file tools, symbolic links).
 
-**Ask paths.** The baseline asks before edits that touch `package.json`, anything under `scripts/`, or a tool config: `eslint.config.js`, `vitest.config.ts`, `stryker.config.json`, `.dependency-cruiser.cjs`, `knip.json`, `tsconfig.json`, `.markdownlint-cli2.jsonc`, `.prettierrc.json`. The allowed `npm run` check scripts execute these files, so an edit would let Claude run arbitrary code under an allowed command. Edits are the mcp-workspace write tools (`edit_file`, `save_file`, `append_file`, `move_file`, `delete_this_file`, `delete_directory`) and the native `Edit` and `Write` tools. A call touches an entry if any of its paths (`file_path`, `source_path`, `destination_path`, `dir_path`) resolves to the entry, to a file under `scripts/`, or to a directory that contains an entry (for example `delete_directory` on `scripts` or `.`). This is a path guard, not a profile rule (the v1 grammar cannot express it), and it applies with step 2: the guard returns ask even if a profile allows the tool, and a protected-path deny still wins over it.
+**Ask paths.** The baseline asks before edits that touch `package.json`, anything under `scripts/`, or a tool config: `eslint.config.js`, `vitest.config.ts`, `stryker.config.json`, `.dependency-cruiser.cjs`, `knip.json`, `tsconfig.json`, `.markdownlint-cli2.jsonc`, `.prettierrc.json`. The allowed `npm run` check scripts execute these files, so an edit would let Claude run arbitrary code under an allowed command. Edits are the mcp-workspace write tools (`edit_file`, `save_file`, `append_file`, `move_file`, `delete_this_file`, `delete_directory`) and the native `Edit` and `Write` tools. A call touches an entry if any of its paths (`file_path`, `source_path`, `destination_path`, `dir_path`) resolves to the entry, to a file under `scripts/`, or to a directory that contains an entry (for example `delete_directory` on `scripts` or `.`). This is a path guard, not a profile rule (the v1 grammar cannot express it), and it is an ask source at step 3: a profile allow does not remove the ask, but any deny wins over it (a protected-path deny, or a profile deny such as `deny *`).
 
-**Redirect message.** A denied subagent Bash call returns a message that names the approved MCP tool to use instead (for example `git status` maps to the read-only `git` tool, `cat file` to `read_file`). Goal 5 of the design: "A denied Bash call tells Claude which approved tool to use instead."
+**Redirect message.** `hooks/guards.ts` exports a pure function `redirectHint(command: string): string | undefined`, backed by the hint table. When `decide` returns `source` = the subagent-Bash rule, `register.ts` (Draft 04) calls it and puts the text in the hook result's `message`; `decide` builds no redirect text. The text names the approved MCP tool to use instead (for example `git status` maps to the read-only `git` tool, `cat file` to `read_file`). Goal 5 of the design: "A denied Bash call tells Claude which approved tool to use instead."
 
 **Security model rows** this closes: "Claude edits the mod's source or config" (protected-paths deny), "Claude writes the variable into a profile" (protected-paths deny on shell profiles).
 
@@ -22,7 +24,7 @@ Assumptions (Draft 01 verifies): 2 (agent id on `tool.call`), 8 (settings files 
 
 ## Existing code
 
-- `hooks/policy.ts`: pure (`Verdict` type only now; `decide` arrives in Draft 03). Add path normalisation and the lists here as pure functions, no `node:path` import, since policy may import nothing.
+- `hooks/policy.ts`: pure (`Verdict` type only now; `decide` arrives in Draft 03 and takes the guard results as input). Do not put the guards here. Create `hooks/guards.ts` with path normalisation and the lists as pure functions, no `node:path` import. It imports nothing; `register.ts` imports it.
 - `hooks/register.ts`: stub; the `tool.call` hook is wired in Draft 04.
 - `.dependency-cruiser.cjs`: `policy-is-pure` forbids imports from `policy.ts`. `vitest.config.ts`: 95% coverage on `policy.ts`. `stryker.config.json`: mutation break at 75.
 - `CLAUDE.md` "Testing strategy": test protected paths including relative paths and `..`, and give every security rule a negative test.
@@ -33,10 +35,11 @@ Block Edit and Write on the mod's own files, ask for the rest of `.claude/` and 
 
 ## Scope
 
+- `hooks/guards.ts`: pure guard functions returning `{ kind: 'deny' | 'ask', message }` or nothing (see Guard results).
 - Protected-path lists (deny and ask), including the configured log folder.
 - The ask-paths guard (see Decisions): `package.json`, `scripts/` and the tool configs, for the mcp-workspace write tools and the native `Edit` and `Write`.
 - Normalise paths: relative paths, `.`, `..`, mixed separators and case on Windows, before matching.
-- A hint table mapping common Bash commands to the approved MCP tool, plus a generic redirect.
+- A hint table mapping common Bash commands to the approved MCP tool, plus a generic redirect, exposed as `redirectHint(command)`.
 - Document the known gap in the README and `SECURITY.md`.
 
 ## Out of scope / later
@@ -49,20 +52,22 @@ Closing the other write routes. Protecting by symlink resolution.
 
 ## Acceptance criteria
 
-- [ ] Tests exist first, with a negative row per protected entry.
+- [ ] Tests exist first, with a negative row per protected entry. Path rows test the guards in `tests/guards.test.ts` directly and check the returned `kind` and `message`.
+- [ ] Combination rows go through `decide` with the guard results: a `deny` result beats a profile allow, an `ask` result is beaten by a profile `deny *`.
 - [ ] `../.claude/settings.json` and `src/../hooks/register.ts` style paths are denied.
 - [ ] `.claude/skills/x/SKILL.md` returns ask, not allow.
 - [ ] Ask-paths guard: each of `package.json`, `scripts/check.mjs` and the eight tool configs returns ask for `mcp__mcp-workspace__edit_file`, `save_file`, `append_file`, `move_file` (as source and as destination), `delete_this_file`, `delete_directory` (on `scripts` and on `.`), and for native `Edit` and `Write`. Negative rows: `src/package.json.bak` style look-alikes and other files are not asked by this guard (the verdict is unchanged).
-- [ ] Ask-path rows cover `./package.json`, `src/../package.json`, `scripts/../eslint.config.js`, `scripts\check.mjs` and `src/../../package.json`; no profile allow turns the ask into allow, and a protected-path deny still wins over ask.
-- [ ] A subagent Bash call returns deny with a message naming an MCP tool.
-- [ ] A command missing from the hint table gets a generic redirect that still names the tool class.
+- [ ] Ask-path rows cover `./package.json`, `src/../package.json`, `scripts/../eslint.config.js`, `scripts\check.mjs` and `src/../../package.json`; no profile allow turns the ask into allow, and a protected-path deny or a profile deny still wins over ask.
+- [ ] `redirectHint('git status')` returns text naming the read-only `git` tool; `redirectHint('cat file')` names `read_file`.
+- [ ] A command missing from the hint table gets a generic redirect that still names the tool class (`redirectHint` returns `undefined` only for input that needs no redirect, such as an empty command).
+- [ ] A subagent Bash call returns deny, and the hook result built by `register.ts` carries the `redirectHint` text in `message` (wiring test, Draft 04).
 - [ ] No profile can unlock a protected path.
 - [ ] The known gap is in the README and `SECURITY.md`.
 - [ ] `npm run check` passes.
 
 ## How to start
 
-First failing test in `tests/policy.test.ts`: `Edit` of `hooks/policy.ts` returns deny, and `Edit` of `src/../hooks/policy.ts` also returns deny.
+First failing test in `tests/guards.test.ts`: the protected-path guard returns a `deny` result for `Edit` of `hooks/policy.ts`, and also for `Edit` of `src/../hooks/policy.ts`.
 
 ## Working rules
 

@@ -10,18 +10,27 @@ This is Draft 03 of 11 (plan: Draft 00). `decide()` is the security boundary. Dr
 
 **Decision order.** The first match wins:
 
-1. A subagent calls Bash and holds no profile with a Bash rule for it: deny, with the redirect message (Draft 05 supplies the text).
+1. A subagent calls Bash and no active allow rule matches the call (an ask or deny rule does not count as holding it): deny. `decide` reports `source` = the subagent-Bash rule and builds no text; `register.ts` (Draft 04) adds the redirect text from Draft 05's `redirectHint`.
 2. Edit or Write targets a protected path: deny (Draft 05 supplies the list).
 3. Across the active set (baseline plus switched-on profiles), deny beats ask beats allow.
 4. A call that matches nothing keeps Claude Code's own verdict.
 
-A deny from Claude Code is never overridden. An allow from Claude Code is downgraded to ask for Bash unless an active rule allows the call.
+A deny from Claude Code is never overridden. An allow from Claude Code is downgraded to ask for Bash unless an active rule allows the call. An active allow rule overrides Claude Code's own ask (that is what the Bash downgrade means), but never Claude Code's own deny. When Claude Code's own verdict is unavailable (assumption 7), `decide` treats it as `ask`.
 
-**Matching.** Version 1 matches non-Bash tools by whole-tool rules only, and Bash by exact and prefix rules in Claude Code's syntax (`Bash(git commit *)`, `Bash(npm run check)`). Whole-tool rules: `*` covers every tool; a bare `mcp__<server>` covers every tool of that server; `mcp__<server>__<tool>` and plain tool names (`Skill`, `Edit`) match exactly. Draft 02's parser rejects every other rule form (an argument on a non-Bash tool, a mid-string `*`), so `decide` never sees one. A Bash rule matches only if the command contains none of these characters: `&` `;` `|` `$` `(` `)` `` ` `` `<` `>`, and no newline. Anything unusual does not match and so asks. Matching by argument is later.
+**Guards compose with the rules; they never override them.** The guards are pure functions in `hooks/guards.ts` (Draft 05 owns them). `register.ts` calls them with the tool call and passes their results to `decide`. Each result is `{ kind: 'deny' | 'ask', message: string }`, or nothing. `decide` computes no paths. A `deny` result (protected path) is a step-2 deny. An `ask` result (the ask-path guard: `package.json`, `scripts/`, tool configs) is an ask source at step 3, so a profile `deny *` still wins over it (deny beats ask beats allow). A guard never turns a deny into an ask or an allow. `decide` passes the guard's `message` through to its decision.
+
+**Matching.** Version 1 matches non-Bash tools by whole-tool rules only, and Bash by exact and prefix rules in Claude Code's syntax (`Bash(git commit *)`, `Bash(npm run check)`). Whole-tool rules: `*` covers every tool; a bare `mcp__<server>` covers every tool of that server; `mcp__<server>__<tool>` and plain tool names (`Skill`, `Edit`) match exactly. A whole-tool `Bash` rule or `*` matches every Bash call, whatever the command. Draft 02's parser rejects every other rule form (an argument on a non-Bash tool, a mid-string `*`), so `decide` never sees one.
+
+Bash matching has two modes. Metacharacters are `&` `;` `|` `$` `(` `)` `` ` `` `<` `>` and a newline.
+
+- **Allow rules (strict).** An exact rule needs equality, a prefix rule needs `startsWith`. If the command contains any metacharacter, an allow rule never matches, so the call asks.
+- **Deny and ask rules (boundary-checked substring), always, with or without metacharacters.** The text tested is the rule's prefix with trailing whitespace removed (`git push` for `Bash(git push *)`) or, for an exact rule, the rule text trimmed (`rm -rf /` for `Bash(rm -rf /)`). It must appear in the command (a) preceded by the start of the command, whitespace or a metacharacter, and (b) followed by whitespace, a metacharacter or the end of the command. Every occurrence is tested; one occurrence that passes both tests is enough. Test (b) is skipped only for prefix rules whose trimmed prefix ends in a colon, such as `Bash(npm run check:*)` (prefix `npm run check:`), because `npm run check:docs` continues with word characters. Exact rules always need (b). An empty prefix (`deny Bash(*)`, `ask Bash(*)`) always matches. A literal `startsWith("git push ")` would miss bare `git push` and `git push<TAB>origin`, and an exact-equality `Bash(rm -rf /)` would miss `rm -rf / b`, so those denies would be inert for the plainest commands. So `deny Bash(git push *)` fires on `git push`, `x; git push`, `git push origin main` and `xgit push; git push`, but not on `git pushd`; `deny Bash(rm -rf /)` fires on `rm -rf /`, `rm -rf / b` and `a; rm -rf /`, but not on `rm -rf /tmp` (test (b) fails).
+
+Nothing is trimmed or normalised: odd spacing that misses an allow rule falls through (ask for Bash). Matching by argument is later.
 
 **Baseline.** Reads: mcp-workspace read tools (files, directories, search, reference projects, read-only `git`, GitHub reads, `check_*`). Writes: `edit_file`, `save_file`, `append_file`, `move_file`, `delete_this_file`, `delete_directory`. Checks: exact `npm run` scripts `check`, `typecheck`, `lint`, `format`, `format:check`, `test`, `test:coverage`, `test:mutation`, `arch`, `deadcode`, `docs:lint`, `check:*`, `audit`. `npm ci` and `npm install` ask. Also Skill, Agent, web fetch and web search. Ask: edits to `package.json`, `scripts/` and tool configs. Deny: protected paths. These two are path guards (Draft 05), not profile rules, because the v1 grammar cannot say "edit tool, but only for this path". Git writes are not in the baseline; all other Bash asks.
 
-**Unknown input** falls back to ask or deny, never allow.
+**Malformed input** is a Bash call whose `command` is missing or not a string, or any call with no tool name. No allow rule matches it, not even a whole-tool `Bash` or `*` rule, so `decide` returns `ask` (a subagent's malformed Bash call is a step-1 deny; Claude Code's own deny still stands). An **unknown non-Bash tool** that no active rule matches keeps Claude Code's own verdict, including its allow: the mod neither loosens nor tightens what it does not know.
 
 ## Existing code
 
@@ -31,33 +40,48 @@ A deny from Claude Code is never overridden. An allow from Claude Code is downgr
 
 ## Goal
 
-Implement `decide()` in `hooks/policy.ts` with the decision order above, pure and fully tested. The input is the call (tool name, tool input), the active set (the baseline in the shape above plus the switched-on profiles), the agent context and Claude Code's own verdict. The output is a verdict plus the matched rule's `raw` and the profile name that fired.
+Implement `decide()` in `hooks/policy.ts` with the decision order above, pure and fully tested. The input is the call (tool name, tool input), the active set (the baseline in the shape above plus the switched-on profiles), the list of guard results (`{ kind: 'deny' | 'ask', message }` from Draft 05's `hooks/guards.ts`), the agent context and Claude Code's own verdict. The output is a decision `{ verdict, source, rule?, profile?, message? }`. `source` says what fired: a profile or baseline rule, a guard, the subagent-Bash rule, or Claude Code's own verdict passed through. `rule` is the matched rule's `raw`; `profile` is its profile name (`baseline` for baseline rules). `message` is the firing guard's message, passed through unchanged. Draft 04 builds the hook result `{ verdict, message? }` from it. When `source` is the subagent-Bash rule, `register.ts` calls `redirectHint(command)` (Draft 05, `hooks/guards.ts`) and puts its text in `message`; `decide` builds no redirect text. The profile hint for denials is added the same way. Drafts 07 and 08 use `source`. Field names other than `verdict`, `source`, `rule`, `profile` and `message` are the implementer's choice.
 
 ## Scope
 
 - Build the matching on the `Profile` and `Rule` types in `hooks/policy.ts`. Whichever of Draft 02 or Draft 03 starts first defines them there and says so in its PR; the other builds on them. A `Rule` is `{ tool, kind: 'whole' | 'exact' | 'prefix', arg?, raw }` (`arg` for exact and prefix), where `raw` is the original rule string. A `Profile` is `{ name, description, delegable, allow, ask, deny }` with `Rule[]` lists.
 - Take the active set as input: the baseline, `{ name: 'baseline', allow: Rule[], ask: Rule[], deny: Rule[] }`, plus the switched-on profiles. Draft 02's `loadConfig` supplies the parsed baseline in `config.baseline`.
-- Define the input and output types. Return the rule that fired (reported by its `raw`) and its profile name, because Draft 07 logs them and Draft 08 explains them.
-- Whole-tool matching (`*`, bare `mcp__<server>`, `mcp__<server>__<tool>`, plain names) and Bash exact and prefix matching with the metacharacter rule.
+- Define the input and the decision types (see Goal). Report the rule that fired by its `raw`, its profile name and the `source`, because Draft 07 logs them and Draft 08 explains them.
+- Whole-tool matching (`*`, bare `mcp__<server>`, `mcp__<server>__<tool>`, plain names) and Bash exact and prefix matching in two modes: strict for allow rules, boundary-checked substring for deny and ask rules.
 - Deny beats ask beats allow; Claude Code's deny never overridden; unmatched keeps Claude Code's verdict.
-- Subagent Bash rule (step 1) and protected-path hook (step 2) as parameters, so Draft 05 and Draft 06 only supply data.
+- Subagent Bash rule (step 1) and the guard results (a `deny` result at step 2, an `ask` result at step 3) as parameters, so Draft 05 and Draft 06 only supply data. `decide` does not compute paths.
 
 ## Out of scope / later
 
-Matching by argument. Enforce mode. The protected-path list and redirect text (Draft 05). Agent assignment (Draft 06).
+Matching by argument. Enforce mode. The guards themselves, the protected-path list and `redirectHint` (Draft 05). Agent assignment (Draft 06).
 
 ## Acceptance criteria
 
 - [ ] Table-driven tests were written before the code.
 - [ ] Every step of the decision order has a row, and so does the order itself.
-- [ ] Bash rows cover `&&`, `;`, `|`, `$()`, backticks, `<`, `>`, a newline and odd spacing (tabs, double spaces, leading space).
+- [ ] Bash rows cover `&&`, `;`, `|`, `$()`, backticks, `<`, `>`, a newline and odd spacing (tabs, double spaces, leading space). Each odd-spacing row states its expected result: the command is not trimmed or normalised, so `Bash(git commit *)` against ` git commit -m x` or `git  commit -m x` falls through and asks.
 - [ ] Negative test: `gh issue edit 1 && rm -rf .` is not allowed by a prefix rule `Bash(gh issue edit *)`.
+- [ ] No metacharacters: `deny Bash(git push *)` fires on `git push`, on `git push<TAB>origin` and on `git push origin main`, and does not fire on `git pushd`. `deny Bash(rm -rf /)` fires on `rm -rf /` and on `rm -rf / b`, and does not fire on `rm -rf /tmp` (exact rules always need the follow boundary).
+- [ ] Deny and ask side, prefix rule: `deny Bash(git push *)` denies `x; git push`, `x && git push origin` and `x; git push<TAB>origin`; it does not fire on `x; git pushd` or `x; git pusher`. `deny Bash(git push *)` also denies `x;git push`, `git push;`, `git push&&y` and `git push` followed by a newline and another command. `ask Bash(git push *)` asks for the three matching commands; a whole-tool `Bash` or `*` rule matches `x; git push` too.
+- [ ] Deny and ask side, exact rule: `deny Bash(rm -rf /)` denies `a; rm -rf /` and `a && rm -rf / b`; it does not fire on `a; rm -rf /tmp` or `a; xrm -rf /`. `ask Bash(rm -rf /)` asks for `a; rm -rf /`.
+- [ ] Every occurrence is tested: `deny Bash(git push *)` denies `xgit push; git push` (the first occurrence fails the preceding boundary, the second passes).
+- [ ] Colon-ending prefix: `deny Bash(npm run check:*)` fires on `x; npm run check:docs` (the follow-boundary test is skipped for this prefix rule). An exact rule never skips it.
+- [ ] Claude Code's own verdict unavailable (assumption 7): an unmatched call gets `ask`, and so does a Bash call no active rule allows; a matching deny rule still denies.
+- [ ] The subagent-Bash deny reports `source` subagent-Bash and no redirect text; `register.ts` (Draft 04) adds the text from `redirectHint`.
+- [ ] Empty prefix: `deny Bash(*)` and `ask Bash(*)` match `x; git push` and `git status`.
+- [ ] A rule allow overrides Claude Code's ask but not its deny: an active allow with a Claude Code ask gives allow; with a Claude Code deny it stays deny.
+- [ ] Allow rules never use substring mode: `allow Bash(git status *)` and `allow Bash(npm run check)` do not match `x; git status` or `x; npm run check`.
+- [ ] Step 1 holds only for allow rules: a subagent whose only matching Bash rule is an ask or deny still gets the redirect deny.
+- [ ] Guards compose (rows pass guard results in, no paths): a `deny` guard result wins over a profile allow; an `ask` guard result asks despite a profile allow, but a profile `deny *` or `deny mcp__srv` wins over it; no row turns a deny into an ask or allow.
+- [ ] A guard result's `message` appears unchanged in the decision, and the decision reports `source` guard.
 - [ ] Whole-tool rows: an allow `mcp__srv` matches `mcp__srv__a` and `mcp__srv__b` but not `mcp__srv2__a`, `mcp__other__a` or `Bash`; `mcp__srv__a` matches only that tool (not `mcp__srv__ab`); a plain name (`Skill`) matches only that tool; `*` matches every tool, including `Bash` and an `mcp__` tool.
 - [ ] `*` in a deny list denies every call, including a baseline-allowed read tool. `*` in an ask list asks for every call. `mcp__srv` in deny denies all tools of that server and no others.
 - [ ] A Claude Code deny stays a deny in every row.
 - [ ] A Claude Code allow for Bash becomes ask unless an active rule allows it.
-- [ ] A decision from a rule reports that rule's `raw` and its profile name (baseline rules report `baseline`).
-- [ ] Unknown tool or malformed input never returns allow.
+- [ ] A decision from a rule reports `source`, that rule's `raw` and its profile name (baseline rules report `baseline`). A guard, the subagent-Bash rule and a passed-through Claude Code verdict each report their own `source`.
+- [ ] Malformed input: a Bash call with a missing or non-string `command` (even under an active `allow Bash` or `allow *`), and a call with no tool name, each return `ask`. The same Bash call from a subagent returns `deny` (step 1).
+- [ ] Unknown non-Bash tool, no active rule matches: Claude Code's own verdict is passed through, allow included, with `source` = Claude Code's verdict.
+- [ ] `decide` never returns allow on its own for unknown or malformed input. Allow comes only from an active allow rule or from Claude Code's own allow passed through for an unmatched non-Bash call (step 4).
 - [ ] `npm run test:coverage` reaches 95% on `hooks/policy.ts`.
 - [ ] `npm run test:mutation` stays above the `break` threshold of 75 (aim for the `high` of 90).
 - [ ] `npm run check` passes, including `npm run arch`.
@@ -68,7 +92,7 @@ First failing test in `tests/policy.test.ts`: `decide` of a baseline read tool w
 
 ## Open questions
 
-- Quoted arguments that contain a listed character (for example `git commit -m "a;b"`) do not match, so they ask. Accept this for v1 (safe, may be annoying)?
+None. Settled: a Bash command containing a metacharacter, even inside quotes (`git commit -m "a;b"`), never matches an allow rule, so it asks. This is safe and may be annoying; v1 accepts it.
 
 ## Working rules
 
