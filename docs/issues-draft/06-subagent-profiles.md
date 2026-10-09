@@ -94,7 +94,7 @@ A request tool for subagents. Skill and agent declared profiles. Gating non-Bash
 - [ ] A subagent Bash call that no active allow rule matches is denied with the redirect (`source` `subagent-bash`).
 - [ ] An unmatched non-Bash subagent call keeps Claude Code's verdict (documented limit).
 - [ ] Fallbacks: with assumption 2 failed, every call is decided as main-session; with assumption 10 failed (including no linking value), subagents get the baseline only; with assumption 11 failed, the work stops and asks.
-- [ ] README documents the assignment marker and the limit of enforcement (Bash-only deny; an unmatched non-Bash call keeps Claude Code's verdict).
+- [ ] Documentation criteria that Draft 09's README and `SECURITY.md` text must satisfy: they document the assignment marker and the limit of enforcement (Bash-only deny; an unmatched non-Bash call keeps Claude Code's verdict). Draft 09 owns that text.
 - [ ] `npm run check` passes.
 
 ## How to start
@@ -109,7 +109,7 @@ TDD, KISS, clean code, concise writing. Use the mcp-workspace MCP tools for file
 
 ## Depends on
 
-Draft 01 (assumptions 2, 10, 11), Draft 02, Draft 03, Draft 04, Draft 05 (shares the gate files and the guard mechanism), Draft 09 (sets the delegable flags of the built-in profiles)
+Draft 01 (assumptions 2, 10, 11), Draft 02, Draft 03, Draft 04, Draft 05 (shares the gate files and the guard mechanism). Both built-in profiles are `delegable: true`, so no Draft 09 dependency.
 
 ## References
 

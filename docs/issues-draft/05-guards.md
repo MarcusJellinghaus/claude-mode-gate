@@ -68,7 +68,7 @@ Block the write tools on the mod's config, logs, installed copy, settings files 
 - Path normalisation as in Matching, before comparing.
 - A hint table mapping common Bash commands to the approved MCP tool, plus a generic redirect, exposed as `redirectHint(command)`.
 - Gates for the new pure module: add `hooks/guards.ts` to the coverage include list in `vitest.config.ts` (keep the 95% thresholds), to the `mutate` list in `stryker.config.json`, and add a dependency-cruiser rule (like `policy-is-pure`) so `hooks/guards.ts` imports nothing.
-- Document the known gap and the containment limit in the README and `SECURITY.md`.
+- Supply the documentation criteria for the known gap and the containment limit; Draft 09 writes the README and `SECURITY.md` text.
 
 ## Out of scope / later
 
@@ -99,7 +99,7 @@ Closing the other write routes. Protecting by symlink resolution.
 - [ ] A subagent Bash call (an event with an agent id, no active allow rule for it) returns deny, and the hook result built by the shared path (`hooks/gate.ts`, wired by `register.ts`) carries the `redirectHint` text in `message` (wiring test added by this draft, with the real `redirectHint`; it builds on Draft 04 and needs no Draft 06).
 - [ ] No profile can unlock a protected path.
 - [ ] Gates: `hooks/guards.ts` is in the coverage include list of `vitest.config.ts` and `npm run test:coverage` reaches 95% on it (and still on `hooks/policy.ts`); it is in the Stryker `mutate` list and `npm run test:mutation` stays above the `break` threshold of 75; a dependency-cruiser rule makes `hooks/guards.ts` import nothing (`npm run arch` passes).
-- [ ] The known gap and the containment limit are in the README and `SECURITY.md`.
+- [ ] Documentation criteria that Draft 09's README and `SECURITY.md` text must satisfy: they state the known gap and the containment limit. Draft 09 owns that text.
 - [ ] `npm run check` passes.
 
 ## How to start

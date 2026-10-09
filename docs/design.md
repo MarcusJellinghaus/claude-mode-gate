@@ -66,7 +66,7 @@ Always on:
 
 The Ask and Deny bullets are implemented as path guards (Draft 05), not as profile rules: the v1 rule grammar has only whole-tool and Bash prefix rules, so it cannot say "edit tool, but only for this path".
 
-Not in the baseline: git writes (`add`, `commit`, `push`, `checkout -b`). A `git-write` profile allows them. All other Bash asks.
+Not in the baseline: git writes (`add`, `commit`, `push`, `checkout -b`). A `git-write` profile allows `git add`, `git commit` and `git checkout -b` as prefix rules, and `git push` only in the exact forms `git push`, `git push -u origin HEAD` and `git push --force-with-lease`. The v1 grammar cannot deny `--force` without over-matching, nor allow a push prefix without letting `--force` through, so every other push asks; parameterised profiles (see [Later](#later)) can widen this. Both built-in profiles are delegable. All other Bash asks.
 
 ### Decision order
 
@@ -258,7 +258,6 @@ Check each against the mods reference and its TypeScript declarations before bui
 
 ## Open items
 
-- The exact rules of the first profiles (`git-write`, `issues`) and which profiles are non-delegable.
 - The marketplace name and the minimum Claude Code version.
 - Repo setup: apply the ruleset on `main` (PR and CI required, admins included), CodeQL, action pinning.
 

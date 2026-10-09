@@ -63,7 +63,7 @@ In v1: baseline, profiles, the commands, guards, subagent profiles, band, log, e
 | 06    | Subagent profiles                             | Delegation by agent id                                                                                        |
 | 07    | Band, /gate-why and decision log              | Visibility                                                                                                    |
 | 08    | /gate-explain and offline replay              | Dry run and transcript replay                                                                                 |
-| 09    | First profiles and README                     | `git-write`, `issues`, "what it can reach" docs                                                               |
+| 09    | First profiles and README                     | `git-write`, `issues`, README and SECURITY.md                                                                 |
 | 10    | Housekeeping: skills, agents and plugin CI    | Adapt copied files, add `claude plugin` checks                                                                |
 | 11    | Post-merge repo setup: rulesets and CodeQL    | Protect `main`, code scanning                                                                                 |
 
@@ -83,7 +83,7 @@ In v1: baseline, profiles, the commands, guards, subagent profiles, band, log, e
 
 ## Order of work
 
-All issue work starts after PR #1 is merged to `main`. Draft 01 first. Drafts 02 and 03 can then run in parallel. Draft 04 needs both. Drafts 05 and 06 need 03 and 04. Draft 08 needs 02, 03, 04, 05 and 06 (the subagent effective set and `checkAssignment`). Draft 07 needs 04 and 05; 07 and 08 are otherwise independent. Draft 09 needs 02 to 05. Draft 10 can start after 01; replacing the agents with profiles waits for 06 and 09. Draft 11 waits for the merge of PR #1.
+All issue work starts after PR #1 is merged to `main`. Draft 01 first. Drafts 02 and 03 can then run in parallel. Draft 04 needs both. Drafts 05 and 06 need 03 and 04. Draft 08 needs 02, 03, 04, 05 and 06 (the subagent effective set and `checkAssignment`). Draft 07 needs 04 and 05; 07 and 08 are otherwise independent. Draft 09 needs 02 to 08 (it owns the README and `SECURITY.md` text). Draft 10 can start after 01; replacing the agents with profiles waits for 06 and 09. Draft 11 waits for the merge of PR #1.
 
 ## Scope
 
