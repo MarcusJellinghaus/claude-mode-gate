@@ -1,6 +1,6 @@
 # claude-mode-gate: design
 
-Updated 7 October 2026. Owner: Marcus Jellinghaus.
+Updated 9 October 2026. Owner: Marcus Jellinghaus.
 
 ## Summary
 
@@ -37,8 +37,21 @@ Non-goals:
 
 - **Baseline.** Always-on rules (see below). It also holds the fixed denies (protected paths).
 - **Profile.** A named bundle with a description and three rule lists: `allow`, `ask` and `deny`. The same shape as the `permissions` block in `settings.json`. A profile that only has `deny` entries is a restriction, for example a read-only profile.
+- **Delegable.** A boolean per profile, default `true`. A non-delegable profile cannot be handed to a subagent.
 - **Active set.** The baseline plus the profiles that are switched on.
 - **Rule syntax.** Claude Code's: `mcp__server__tool`, `Bash(npm run check)`, `Bash(git commit *)`.
+
+### Where profiles live
+
+Three layers:
+
+1. The **baseline** is built into the mod and cannot be overridden.
+2. **Built-in profiles** (`git-write`, `issues`) ship with the mod and work with no config file.
+3. The **user file** adds profiles and may replace a built-in by reusing its name. The whole definition wins, with no merging.
+
+The user file is JSON at `$XDG_CONFIG_HOME/mode-gate/config.json`, falling back to `~/.config/mode-gate/config.json` on all platforms, Windows included. `MODE_GATE_CONFIG` overrides the path, mainly for tests and headless runs. The shape is `{ "profiles": { "<name>": { "description", "delegable", "allow", "ask", "deny" } } }`. A JSON Schema, `mode-gate.schema.json`, ships in the repo, and users reference it with `$schema`.
+
+A project may contain `.mode-gate.json` at its root, in the same shape. Its profiles are proposals and are never active. `/gate-check` lists them. The user adopts one by copying it into their own config by hand. Across active profiles, deny beats ask beats allow, whatever the source, and nothing loosens the baseline's denies. An invalid config fails closed: only the baseline is active, and the errors are shown.
 
 ### Baseline
 
@@ -50,6 +63,8 @@ Always on:
 - **Other tools:** Skill, Agent, web fetch and web search. A fetched URL or a search query can leak data, and fetched pages can carry injected instructions. The baseline accepts this.
 - **Ask:** edits to `package.json`, `scripts/` and the tool configs, because the allowed `npm run` scripts execute them.
 - **Deny:** the protected paths.
+
+The Ask and Deny bullets are implemented as path guards (Draft 05), not as profile rules: the v1 rule grammar has only whole-tool and Bash prefix rules, so it cannot say "edit tool, but only for this path".
 
 Not in the baseline: git writes (`add`, `commit`, `push`, `checkout -b`). A `git-write` profile allows them. All other Bash asks.
 
@@ -72,14 +87,14 @@ A deny from Claude Code is never overridden. An allow from Claude Code is downgr
 
 ## Commands
 
-| Command                  | Purpose                                                          |
-| ------------------------ | ---------------------------------------------------------------- |
-| `/gate-on <profile>...`  | Switch profiles on. Prints a short summary of what they allow.   |
-| `/gate-off <profile>...` | Switch profiles off. `all` switches every profile off.           |
-| `/gate-status`           | Baseline, active profiles and the files they came from.          |
-| `/gate-why [n]`          | The last n verdicts with the rule and profile that fired.        |
-| `/gate-check`            | Validate the config: conflicts, unknown tools, over-broad rules. |
-| `/gate-explain <tool> …` | Dry run one call and show the verdict and the rule chain.        |
+| Command                  | Purpose                                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------- |
+| `/gate-on <profile>...`  | Switch profiles on. Prints a short summary of what they allow.                                 |
+| `/gate-off <profile>...` | Switch profiles off. `all` switches every profile off.                                         |
+| `/gate-status`           | Baseline, active profiles and the files they came from.                                        |
+| `/gate-why [n]`          | The last n verdicts with the rule and profile that fired.                                      |
+| `/gate-check`            | Validate the config: conflicts, unknown tools, over-broad rules. Also lists project proposals. |
+| `/gate-explain <tool> …` | Dry run one call and show the verdict and the rule chain.                                      |
 
 Replay runs offline as a command-line tool. It reads a Claude Code session transcript and reports what each call would have been under a given config.
 
@@ -114,7 +129,7 @@ Auto and bypass mode are out of scope for version 1. The README says the mod is 
 
 ## Protected paths
 
-- **Deny** Edit and Write on the mod's config and source, `settings*.json`, hooks, shell profiles and the log folder.
+- **Deny** Edit and Write on the mod's config (`config.json` in the user config folder) and source, `settings*.json`, hooks, shell profiles and the log folder.
 - **Ask** for the rest of `.claude/` (skills, agents).
 - Other write routes (PowerShell, NotebookEdit, MCP file tools, symbolic links) are a known gap.
 
@@ -209,6 +224,7 @@ Check each against the mods reference and its TypeScript declarations before bui
 
 - Parameterised profiles, for example `issues 123` for one issue only.
 - Profiles that skills and agents declare in their definitions.
+- Project profiles that become usable after per-repo approval, and a command that adopts a proposal into the user config.
 - A typed commit and push tool, so those calls need no Bash.
 - Enforce mode for bypass.
 - Replay refinements and a persistent log with arguments.
@@ -217,7 +233,6 @@ Check each against the mods reference and its TypeScript declarations before bui
 ## Open items
 
 - The exact rules of the first profiles (`git-write`, `issues`) and which profiles are non-delegable.
-- Where profiles are defined, and how a project may propose profiles that the user then approves.
 - The marketplace name and the minimum Claude Code version.
 - Repo setup: apply the ruleset on `main` (PR and CI required, admins included), CodeQL, action pinning.
 

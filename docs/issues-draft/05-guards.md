@@ -12,6 +12,8 @@ This is Draft 05 of 11 (plan: Draft 00). The rule that makes the whole mod trust
 
 **Protected paths.** Deny Edit and Write on: the mod's config and source, `settings*.json`, hooks, shell profiles and the log folder (configurable, default `logs`). Ask for the rest of `.claude/` (skills, agents). Known gap, not closed in v1: other write routes (PowerShell, NotebookEdit, MCP file tools, symbolic links).
 
+**Ask paths.** The baseline asks before edits that touch `package.json`, anything under `scripts/`, or a tool config: `eslint.config.js`, `vitest.config.ts`, `stryker.config.json`, `.dependency-cruiser.cjs`, `knip.json`, `tsconfig.json`, `.markdownlint-cli2.jsonc`, `.prettierrc.json`. The allowed `npm run` check scripts execute these files, so an edit would let Claude run arbitrary code under an allowed command. Edits are the mcp-workspace write tools (`edit_file`, `save_file`, `append_file`, `move_file`, `delete_this_file`, `delete_directory`) and the native `Edit` and `Write` tools. A call touches an entry if any of its paths (`file_path`, `source_path`, `destination_path`, `dir_path`) resolves to the entry, to a file under `scripts/`, or to a directory that contains an entry (for example `delete_directory` on `scripts` or `.`). This is a path guard, not a profile rule (the v1 grammar cannot express it), and it applies with step 2: the guard returns ask even if a profile allows the tool, and a protected-path deny still wins over it.
+
 **Redirect message.** A denied subagent Bash call returns a message that names the approved MCP tool to use instead (for example `git status` maps to the read-only `git` tool, `cat file` to `read_file`). Goal 5 of the design: "A denied Bash call tells Claude which approved tool to use instead."
 
 **Security model rows** this closes: "Claude edits the mod's source or config" (protected-paths deny), "Claude writes the variable into a profile" (protected-paths deny on shell profiles).
@@ -27,11 +29,12 @@ Assumptions (Draft 01 verifies): 2 (agent id on `tool.call`), 8 (settings files 
 
 ## Goal
 
-Block Edit and Write on the mod's own files, ask for the rest of `.claude/`, and redirect denied subagent Bash calls to the right MCP tool.
+Block Edit and Write on the mod's own files, ask for the rest of `.claude/` and for the files the check scripts execute, and redirect denied subagent Bash calls to the right MCP tool.
 
 ## Scope
 
 - Protected-path lists (deny and ask), including the configured log folder.
+- The ask-paths guard (see Decisions): `package.json`, `scripts/` and the tool configs, for the mcp-workspace write tools and the native `Edit` and `Write`.
 - Normalise paths: relative paths, `.`, `..`, mixed separators and case on Windows, before matching.
 - A hint table mapping common Bash commands to the approved MCP tool, plus a generic redirect.
 - Document the known gap in the README and `SECURITY.md`.
@@ -49,6 +52,8 @@ Closing the other write routes. Protecting by symlink resolution.
 - [ ] Tests exist first, with a negative row per protected entry.
 - [ ] `../.claude/settings.json` and `src/../hooks/register.ts` style paths are denied.
 - [ ] `.claude/skills/x/SKILL.md` returns ask, not allow.
+- [ ] Ask-paths guard: each of `package.json`, `scripts/check.mjs` and the eight tool configs returns ask for `mcp__mcp-workspace__edit_file`, `save_file`, `append_file`, `move_file` (as source and as destination), `delete_this_file`, `delete_directory` (on `scripts` and on `.`), and for native `Edit` and `Write`. Negative rows: `src/package.json.bak` style look-alikes and other files are not asked by this guard (the verdict is unchanged).
+- [ ] Ask-path rows cover `./package.json`, `src/../package.json`, `scripts/../eslint.config.js`, `scripts\check.mjs` and `src/../../package.json`; no profile allow turns the ask into allow, and a protected-path deny still wins over ask.
 - [ ] A subagent Bash call returns deny with a message naming an MCP tool.
 - [ ] A command missing from the hint table gets a generic redirect that still names the tool class.
 - [ ] No profile can unlock a protected path.
