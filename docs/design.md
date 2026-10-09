@@ -62,7 +62,7 @@ Always on:
 - **Checks:** the exact scripts `npm run check`, `typecheck`, `lint`, `format`, `format:check`, `test`, `test:coverage`, `test:mutation`, `arch`, `deadcode`, `docs:lint`, `check:*` and `audit`. `npm ci` and `npm install` ask, because they run install scripts.
 - **Other tools:** Skill, Agent, web fetch and web search. A fetched URL or a search query can leak data, and fetched pages can carry injected instructions. The baseline accepts this.
 - **Ask:** edits to `package.json`, `scripts/` and the tool configs, because the allowed `npm run` scripts execute them.
-- **Deny:** the protected paths.
+- **Deny:** the protected paths (see [Protected paths](#protected-paths)).
 
 The Ask and Deny bullets are implemented as path guards (Draft 05), not as profile rules: the v1 rule grammar has only whole-tool and Bash prefix rules, so it cannot say "edit tool, but only for this path".
 
@@ -135,9 +135,18 @@ Auto and bypass mode are out of scope for version 1. The README says the mod is 
 
 ## Protected paths
 
-- **Deny** Edit and Write on the mod's config (`config.json` in the user config folder) and source, `settings*.json`, hooks, shell profiles and the log folder.
-- **Ask** for the rest of `.claude/` (skills, agents).
-- Other write routes (PowerShell, NotebookEdit, MCP file tools, symbolic links) are a known gap.
+Covered tools: the mcp-workspace write tools (`edit_file`, `save_file`, `append_file`, `move_file`, `delete_this_file`, `delete_directory`; a tool name matches on the part after the last `__`) and the native `Edit` and `Write`. A directory that contains a protected path counts.
+
+- **Deny:**
+  - the mod's config file and the log folder;
+  - `settings*.json` inside any `.claude` folder, in the project and in the home folder (hook definitions live there);
+  - `~/.claude/plugins/**`, the installed copy of the mod;
+  - shell profiles in the home folder: `.bashrc`, `.bash_profile`, `.profile`, `.zshrc`, `.zprofile`, `.zshenv`, `.config/fish/config.fish`, and the PowerShell `*profile*.ps1` files under `Documents/PowerShell` and `Documents/WindowsPowerShell`.
+- **Ask:** the rest of `.claude/` (skills, agents, `CLAUDE.md`) in the project and the home folder, and in the project `package.json`, `scripts/`, the tool configs, `.mcp.json`, `.git/hooks/**` and `.git/config` (an allowed `git commit` runs hooks). Also `~/.claude.json`. `.mcp.json` and `~/.claude.json` can launch programs.
+- The project's own `hooks/`, `types/` and `.claude-plugin/` are not protected. Denying them would block development of this repository while the mod is active.
+- Paths are compared case-folded, with `/` and `\` as separators and `.` and `..` resolved without touching the file system. Windows forms are normalised first: `\\?\` and `\\.\` prefixes, trailing dots and spaces on a segment, NTFS stream suffixes (`:name`, `::$DATA`) and MSYS drive paths (`/c/Users/x` becomes `c:\Users\x`, also for the home folder).
+- A directory counts only when a fixed-path entry lies under it. A nested `.claude` inside an arbitrary subdirectory is not found (known limit: the guard is pure and cannot list directories).
+- Other write routes (PowerShell, NotebookEdit, other MCP file tools, symbolic links) are a known gap.
 
 ## Decision log
 

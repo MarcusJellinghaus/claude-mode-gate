@@ -155,6 +155,7 @@ The `/gate-check` command registration (Draft 04). The built-in profile contents
 - [ ] The config path is `MODE_GATE_CONFIG` if set, else `$XDG_CONFIG_HOME/mode-gate/config.json`, else `<home>/.config/mode-gate/config.json` with `<home>` from `HOME`, else `USERPROFILE` of the injected environment. With none set, `loadConfig` fails closed (`ok: false`, `configPath` undefined). The resolved path is returned as `configPath`.
 - [ ] `hooks/baseline.ts` holds exactly the rules listed in Decisions, as strings, and the built-ins are empty placeholders. A test asserts that every baseline and built-in rule string parses without error.
 - [ ] `hooks/baseline.ts` and `hooks/builtin-profiles.ts` import nothing at runtime, enforced by the new dependency-cruiser rule with `tsPreCompilationDeps: true` (`npm run arch` passes).
+- [ ] `hooks/config.ts` is in the coverage include list of `vitest.config.ts` (95% thresholds kept) and in the Stryker `mutate` list of `stryker.config.json`.
 - [ ] `hooks/config.ts` imports the baseline and the built-ins as defaults of `deps`, so `npm run deadcode` passes.
 - [ ] The tests inject the baseline, the built-ins, the file reader, the environment and `cwd`, and never touch the real home directory.
 - [ ] Negative test: profiles from a project `.mode-gate.json` are never in the active set and cannot loosen a baseline deny.
