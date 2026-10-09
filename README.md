@@ -1,6 +1,6 @@
 # claude-mode-gate
 
-A Claude Code mod with switchable permission profiles: a safe baseline, named profiles you switch on and off, and everything else still asks.
+A Claude Code mod with switchable permission profiles: a safe baseline and named profiles you switch on and off. Bash that no active rule allows asks. For other tools the mod adds only its own rules and guards; Claude Code's own verdict applies to the rest.
 
 **Status:** design stage, nothing is built yet. See [docs/design.md](docs/design.md) for goals, decisions and open points.
 

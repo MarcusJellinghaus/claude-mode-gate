@@ -1,5 +1,5 @@
 {
   "name": "mode-gate",
   "version": "0.0.0",
-  "description": "A Claude Code mod with switchable permission profiles: a safe baseline, named profiles you switch on and off, and everything else still asks."
+  "description": "A Claude Code mod with switchable permission profiles: a safe baseline and named profiles you switch on and off. Bash that no active rule allows asks. For other tools the mod adds only its own rules and guards; Claude Code's own verdict applies to the rest."
 }

@@ -99,7 +99,7 @@ Implement `decide()` in `hooks/policy.ts` with the decision order above, pure an
 
 ## Out of scope / later
 
-Matching by argument. Other Bash input fields: `decide` looks only at `command`, as Claude Code does, so an allow rule such as `Bash(npm run check)` also covers a call with `dangerouslyDisableSandbox` (Claude Code's own opt-in for a prompt is an ask rule `Bash(dangerouslyDisableSandbox:true)`; Draft 13 documents it). Globs in deny and ask rules. Enforce mode. The guards themselves, the protected-path list and `redirectHint` (Draft 05). Agent assignment (Draft 06).
+Matching by argument. Other Bash input fields: `decide` ignores every Bash input field other than `command`. An allow rule such as `Bash(npm run check)` therefore also covers a call that asks to run outside the sandbox (`dangerouslyDisableSandbox`), as in Claude Code itself, and the user has no prompt for it while such an allow rule is active (Draft 13 documents it). Globs in deny and ask rules. Enforce mode. The guards themselves, the protected-path list and `redirectHint` (Draft 05). Agent assignment (Draft 06).
 
 ## Acceptance criteria
 

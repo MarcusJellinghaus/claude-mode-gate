@@ -70,6 +70,7 @@ Replay of a session transcript (`npm run replay`; a Later item in `docs/design.m
   - an `allow` from an active allow rule, and an `ask` from a rule, a guard, `bash-downgrade` or `malformed`: carry "unless Claude Code denies";
   - a `claude-code` result (the stand-in allow for an unmatched non-Bash call): carries "unless Claude Code denies or asks" and the assumed-allow note.
 - [ ] `/gate-explain` is registered with `immediate: true`, a description and an `argumentHint`, inside the single `session.start` hook (no second `session.start` registration; Draft 07's wiring test covers it), and its `.catch` returns an error `{ text }` and changes nothing.
+- [ ] The pinned example outputs live in `tests/fixtures/readme-<command>.txt`, are used by the command's own test, and are read by `tests/readme-examples.test.ts` (Draft 13). This draft pins one sample output each for the three README cases: Bash text (`npm install`, `ask`, `bash-downgrade`) in `readme-gate-explain-bash.txt`, JSON input (`mcp__mcp-workspace__edit_file {"file_path": ".claude/settings.json"}`, `deny` from a guard) in `readme-gate-explain-json.txt`, and `--agent a1 Bash git status` (`subagent-bash`, with the redirect text, flagged as an approximation) in `readme-gate-explain-agent.txt`; each file holds the exact output text of its test.
 - [ ] README documentation is Draft 13's; the examples it needs come from the rows above.
 - [ ] `npm run check` passes.
 
