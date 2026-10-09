@@ -4,7 +4,7 @@
 
 claude-mode-gate (plugin name `mode-gate`) is a Claude Code mod, written in TypeScript (strict), that gates Claude's tool calls through a fixed baseline plus switchable profiles (each with `allow`, `ask` and `deny` lists; switched by `/gate-on` and `/gate-off`). Because it is a security tool, the repository itself needs to resist tampering.
 
-This is Draft 11 of 11 (plan: Draft 00). It is repository administration, not code. It needs admin rights and the GitHub API, so the owner does it, or an agent with the owner's explicit approval. It happens after PR #1 (branch `feature/initial-repo-setup`) is merged.
+This is Draft 11 of 13 (plan: Draft 00). It is repository administration, not code. It needs admin rights and the GitHub API, so the owner does it, or an agent with the owner's explicit approval. It happens after PR #1 (branch `feature/initial-repo-setup`) is merged.
 
 ## Design decisions this issue relies on
 
@@ -23,7 +23,7 @@ This is Draft 11 of 11 (plan: Draft 00). It is repository administration, not co
   - `security`: `Dependency audit and secret scan`
   - `mutation`: `Mutation tests (policy.ts)`, runs only on `schedule` or `workflow_dispatch`
 - Draft 10 adds `claude plugin validate` and `claude plugin test` to the `plugin` job and may add or rename a plugin check, so the names are confirmed again before the ruleset is applied.
-- `.github/dependabot.yml`, `SECURITY.md` (owned by Draft 09), `LICENSE` (MIT), `CHANGELOG.md`, `CLAUDE.md` (Workflow section).
+- `.github/dependabot.yml`, `SECURITY.md` (owned by Draft 13), `LICENSE` (MIT), `CHANGELOG.md`, `CLAUDE.md` (Workflow section).
 
 ## Goal
 
@@ -55,7 +55,7 @@ Do the steps in this order.
    The session reads the API response back and checks that `bypass_actors` is empty and `enforcement` is `active`.
 
 3. **CodeQL default setup only**: `PATCH /repos/{owner}/{repo}/code-scanning/default-setup` with `state: configured`, `query_suite: default` and `languages: ["javascript-typescript", "actions"]`. Do not add a CodeQL workflow file; it would conflict with the default setup. CodeQL is not made a required check. After enabling, note its expected check name on a PR as "confirm from a real run"; do not guess a name.
-4. **Documentation through a PR (first of two).** Write `docs/repo-settings.md`: the `main` ruleset JSON body, the CodeQL default-setup state and the line "immutable releases: pending", so they can be reproduced. It must pass `npm run docs:lint` and `npm run check:docs`. SECURITY.md is not touched (Draft 09 owns it). Open it as a pull request, let the required checks pass, and merge it by squash. It merges after the ruleset exists, so this PR is also the test that the ruleset works.
+4. **Documentation through a PR (first of two).** Write `docs/repo-settings.md`: the `main` ruleset JSON body, the CodeQL default-setup state and the line "immutable releases: pending", so they can be reproduced. It must pass `npm run docs:lint` and `npm run check:docs`. SECURITY.md is not touched (Draft 13 owns it). Open it as a pull request, let the required checks pass, and merge it by squash. It merges after the ruleset exists, so this PR is also the test that the ruleset works.
 5. **Before the first release tag**: a tag ruleset (`target: tag`, include `refs/tags/v*`, `bypass_actors: []`, rules `deletion`, `non_fast_forward`, `update`), and immutable releases. Immutable releases is a repository setting. Check the GitHub documentation for an API. If none exists, stop and ask the owner to enable it on the repository settings page (see Stop and ask). Add the tag ruleset JSON body and the immutable-releases state to `docs/repo-settings.md` through a second PR.
 
 ## Out of scope / later
@@ -92,7 +92,7 @@ Concise writing. Use the mcp-workspace tools for file work; Bash only for `gh ap
 
 ## Depends on
 
-PR #1 merged. Draft 10 merged first, so the plugin check names are final. Not part of the Drafts 01 to 09 build chain.
+PR #1 merged. Draft 10 merged first, so the plugin check names are final. Not part of the build chain (Drafts 01 to 09, 12 and 13).
 
 ## References
 
