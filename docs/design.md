@@ -59,7 +59,7 @@ Always on:
 
 - **Reads:** the mcp-workspace read tools (files, directories, search, reference projects, read-only `git`, GitHub reads, `check_*`).
 - **Writes:** `edit_file`, `save_file`, `append_file`, `move_file`, `delete_this_file`, `delete_directory`. Protected paths still deny. Deleting untracked files cannot be undone with git.
-- **Checks:** the exact scripts `npm run check`, `typecheck`, `lint`, `format`, `format:check`, `test`, `test:coverage`, `test:mutation`, `arch`, `deadcode`, `docs:lint`, `check:*` and `audit`. `npm ci` and `npm install` ask, because they run install scripts.
+- **Checks:** the exact scripts `npm run check`, `typecheck`, `lint`, `format`, `format:check`, `test`, `test:coverage`, `test:mutation`, `arch`, `deadcode`, `docs:lint`, `check:*` and `audit`. `npm ci` and `npm install` ask (anchored match, see [Matching](#matching)), because they run install scripts. A Claude Code allow rule such as `Bash(npm ci)` in `settings.json` does not override this ask while the mod is active.
 - **Other tools:** Skill, Agent, web fetch and web search. A fetched URL or a search query can leak data, and fetched pages can carry injected instructions. The baseline accepts this.
 - **Ask:** edits to `package.json`, `scripts/` and the tool configs, because the allowed `npm run` scripts execute them.
 - **Deny:** the protected paths (see [Protected paths](#protected-paths)).
@@ -73,7 +73,7 @@ Not in the baseline: git writes (`add`, `commit`, `push`, `checkout -b`). A `git
 The first rule that matches wins:
 
 1. A subagent calls Bash and holds no rule for it: deny, with the redirect message.
-2. Edit or Write targets a protected path: deny.
+2. A covered write tool targets a protected path: deny.
 3. Across the active set, deny beats ask beats allow.
 4. A call that matches nothing keeps Claude Code's own verdict.
 
@@ -85,7 +85,8 @@ The path guards are extra sources fed into this order, not overrides: a protecte
 
 - Tools match by name and, later, by argument. Version 1 uses whole-tool rules only.
 - Bash rules are exact or prefix rules in Claude Code's syntax. Allow rules are strict: exact equality or `startsWith`, and never a match if the command contains any of `& ; | $ ( ) \` < >` or a newline. Anything unusual asks.
-- Deny and ask rules always use a boundary-checked substring test, with or without metacharacters. The rule text (prefix with trailing whitespace trimmed, or the exact command text) must appear in the command after the start, whitespace or a metacharacter, and before whitespace, a metacharacter or the end. Every occurrence is tested, and one valid occurrence is enough. The end test is skipped only for prefix rules whose trimmed prefix ends in a colon, as in `npm run check:`; exact rules always need it. An empty prefix always matches. So `deny Bash(git push *)` fires on `git push`, `git push<TAB>origin`, `x;git push`, `git push&&y` and `xgit push; git push`, but not on `git pushd`; `deny Bash(rm -rf /)` fires on `rm -rf / b` and `a; rm -rf /`, but not on `rm -rf /tmp`. A plain `startsWith("git push ")` would miss the bare forms and make the deny inert.
+- Deny rules and profile ask rules always use a boundary-checked substring test, with or without metacharacters. The rule text (prefix with trailing whitespace trimmed, or the exact command text) must appear in the command after the start, whitespace or a metacharacter, and before whitespace, a metacharacter or the end. Every occurrence is tested, and one valid occurrence is enough. The end test is skipped only for prefix rules whose trimmed prefix ends in a colon, as in `npm run check:`; exact rules always need it. An empty prefix always matches. So `deny Bash(git push *)` fires on `git push`, `git push<TAB>origin`, `x;git push`, `git push&&y` and `xgit push; git push`, but not on `git pushd`; `deny Bash(rm -rf /)` fires on `rm -rf / b` and `a; rm -rf /`, but not on `rm -rf /tmp`. A plain `startsWith("git push ")` would miss the bare forms and make the deny inert.
+- **Anchored asks (baseline only).** Baseline ask rules use an anchored variant, so that `git commit -m "fix npm install bug"` does not trip the `npm install` ask (ask beats allow, and for subagents and headless runs an ask becomes a deny). The rule text must appear at the start of the command, or directly after `&&`, `;` or `|` with spaces and tabs skipped, and the same end test applies (and the same colon exception). It never matches inside arguments or quotes: `npm install`, `npm install lodash`, `ls && npm install` and `x;npm install` match; `echo "npm install"`, `x npm install` and `npm installx` do not. Quotes are not parsed, so `echo "a; npm install"` still matches. Only the baseline sets the flag: the loader marks the baseline's ask rules as anchored (Draft 02), profile rules are plain strings that cannot carry it, and `decide` ignores the flag on allow and deny rules. A miss is safe, because an unmatched Bash call still asks (Bash downgrade). Profile ask rules and all deny rules keep the loose test above, because a missed deny is the dangerous failure. The strict metacharacter rule for allow rules is unchanged.
 - When Claude Code's own verdict is unavailable (assumption 7), `decide` treats it as `ask`.
 - The redirect text of the step-1 deny comes from `redirectHint` in `hooks/guards.ts`; `gate.ts` adds it to the hook result, `decide` does not build it.
 - A whole-tool `Bash` rule matches every Bash call.
@@ -150,7 +151,7 @@ Covered tools: the mcp-workspace write tools (`edit_file`, `save_file`, `append_
   - `settings*.json` inside any `.claude` folder, in the project and in the home folder (hook definitions live there);
   - `~/.claude/plugins/**`, the installed copy of the mod;
   - shell profiles in the home folder: `.bashrc`, `.bash_profile`, `.profile`, `.zshrc`, `.zprofile`, `.zshenv`, `.config/fish/config.fish`, and the PowerShell `*profile*.ps1` files under `Documents/PowerShell` and `Documents/WindowsPowerShell`.
-- **Ask:** the rest of `.claude/` (skills, agents, `CLAUDE.md`) in the project and the home folder, and in the project `package.json`, `scripts/`, the tool configs, `.mcp.json`, `.git/hooks/**` and `.git/config` (an allowed `git commit` runs hooks). Also `~/.claude.json`. `.mcp.json` and `~/.claude.json` can launch programs.
+- **Ask:** the rest of `.claude/` (skills, agents, `CLAUDE.md`) in the project and the home folder, and in the project `package.json`, `scripts/`, the tool configs, `.mcp.json`, `.git/hooks/**` and `.git/config` (an allowed `git commit` runs hooks). Also `~/.claude.json`. `.mcp.json` and `~/.claude.json` can launch programs. Writes to Claude Code's auto-memory (`~/.claude/projects/*/memory/**`) match `~/.claude/**` and therefore ask on every save, by design; there is no exception.
 - The project's own `hooks/`, `types/` and `.claude-plugin/` are not protected. Denying them would block development of this repository while the mod is active.
 - Paths are compared case-folded, with `/` and `\` as separators and `.` and `..` resolved without touching the file system. Windows forms are normalised first: `\\?\` and `\\.\` prefixes, trailing dots and spaces on a segment, NTFS stream suffixes (`:name`, `::$DATA`) and MSYS drive paths (`/c/Users/x` becomes `c:\Users\x`, also for the home folder).
 - A directory counts only when a fixed-path entry lies under it. A nested `.claude` inside an arbitrary subdirectory is not found (known limit: the guard is pure and cannot list directories).
@@ -158,7 +159,7 @@ Covered tools: the mcp-workspace write tools (`edit_file`, `save_file`, `append_
 
 ## Decision log
 
-- The mod appends to `mode-gate.log.jsonl` in the folder named by the config key `logDir` (default `logs`), resolved relative to the session's project directory; an absolute path is allowed. The folder is created if missing. The mod writes the file itself, not through a tool call. A failed write is swallowed and `/gate-status` shows `log: failing` until the next successful write.
+- The mod appends to `mode-gate.log.jsonl` in the folder named by the config key `logDir` (default `logs`), resolved relative to the session's project directory; an absolute path is allowed. The folder is created if missing. The mod writes the file itself with Node's `fs` (assumption 17), not through a tool call. A failed write is swallowed and `/gate-status` shows `log: failing` until the next successful write.
 - One JSON object per line with the fields `time` (ISO 8601), `verdict`, `source`, `rule` (the matched rule, or null), `profile` (or `baseline`, or null), `agent` (`main` unless the call is a subagent call, then the agent id), `tool`, `toolCallId` (if the event carries one) and `session` (if the API provides one). It records no arguments.
 - A call seen by both gating hooks is logged once, by tool-call id, with the last 200 ids kept in session state. Without an id it may be logged twice.
 - `/gate-why [n]` (n a positive integer, default 10) reads the log and shows this session's entries when entries carry a session id, otherwise the last n of all sessions. Replay uses session transcripts, not the log.
@@ -172,6 +173,8 @@ Every gating hook has a `.catch` handler that fails closed (never allow): `tool.
 - `policy.ts`: pure decision logic. No `$`, no state, no imports.
 - `gate.ts`: the shared decide path used by `tool.call`, `tool.check` and replay. It imports `policy.ts` and takes the effective set (a function of the call), guards, `redirectHint`, `profileHint(decision, call)` (the subagent denial's profile text, built from the effective set and the held profiles), `log`, the `headless` flag and Claude Code's verdict source by injection. It uses no `$` and does no I/O. The live wiring, `/gate-explain` and replay inject the same functions, so they show the same denial text. Only explain and replay pass `withChain`; the live hooks never build the rule chain. The effective set comes from a pure helper in `assignment.ts` (baseline, profiles, active, optional assignment); the live closure over `$.state` wraps it, and explain and replay call it with explicit lists.
 - `explain.ts`: pure text of a decision and its chain, with the exactness notes. `/gate-explain` and replay both import it, so their output cannot drift. It imports only types from `policy.ts` and the decision type, and sits under the same coverage, mutation and purity gates as `guards.ts`.
+- `commands.ts`: pure logic of `/gate-on` and `/gate-off`: all-or-nothing name validation, reserved names, proposal hints and usage text. It returns the new active list and the message; `register.ts` stores the list and prints the message. Imports only types from `policy.ts`; same gates as `guards.ts`.
+- `log-format.ts`: pure decision-log formatting (one JSON line per verdict, no arguments), `/gate-why` line parsing and filtering, and the band text. Imports only types from `policy.ts`; same gates as `guards.ts`. The file write stays in `register.ts`.
 - `register.ts`: thin event wiring. The only importer of host APIs; it wires the real dependencies into `gate.ts`.
 - TypeScript in strict mode.
 - State lives in `$.state` (per session), never in `$.store`, all under one key `gate`: `config`, `active` (profile names in switch-on order), `sessionId`, `logFailing`, `seenIds`, `assignments` and `pending`.
@@ -191,7 +194,9 @@ Every gating hook has a `.catch` handler that fails closed (never allow): `tool.
 ```text
 claude-mode-gate/
   .claude-plugin/   plugin.json, marketplace.json
-  hooks/            hooks.json, register.ts, gate.ts, policy.ts, explain.ts
+  hooks/            hooks.json, register.ts, gate.ts, policy.ts, config.ts, baseline.ts,
+                    builtin-profiles.ts, guards.ts, assignment.ts, commands.ts,
+                    log-format.ts, explain.ts
   types/            index.d.ts
   tests/            unit tests, fixtures/
   docs/             design.md
@@ -206,21 +211,21 @@ See `CLAUDE.md`, "Testing strategy". Policy tests are table-driven and cover the
 
 The rule is that only the user changes profiles, and the mod never makes Claude Code's own verdict weaker than a deny.
 
-| Route                                     | Risk                                          | How it is closed                                                               |
-| ----------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------ |
-| Claude switches a profile itself          | Claude widens its own permissions             | Commands are for the user. The mod registers no tool for switching.            |
-| Claude edits the mod's source or config   | The policy is rewritten                       | Protected-paths deny on Edit and Write.                                        |
-| Claude sets the environment variable      | The profile set changes mid-session           | Not possible: the variable is read once, and a child cannot change its parent. |
-| Claude writes the variable into a profile | The next session starts in the wrong state    | Protected-paths deny on shell profiles. The band shows the state.              |
-| A repo grants itself permissions          | A project file pre-enables profiles           | Starting profiles come only from the user's environment.                       |
-| Another mod submits a prompt as the user  | A skill-declared profile is triggered         | Install only trusted mods.                                                     |
-| Chained or substituted Bash               | `gh issue edit 1 && rm -rf .` passes a prefix | Metacharacters make a prefix rule not match. Prefer typed tools.               |
-| A hook throws or times out                | The hook is skipped and the call runs         | `.catch` on every gating hook returns ask or deny.                             |
-| Auto mode                                 | An allow skips the classifier                 | Out of scope. Profiles do not loosen when the mode is known.                   |
-| Deny rules                                | A mod cannot approve what a deny refuses      | Keep Bash out of deny. Use ask as the baseline.                                |
-| A forgotten profile                       | A standing permission                         | Names in the band, cleared on `/clear`, never restored on resume.              |
-| A subagent asks for more                  | Confused deputy                               | The parent decides, and non-delegable profiles go to the user.                 |
-| Other write routes                        | PowerShell, NotebookEdit, symlinks            | Not closed yet.                                                                |
+| Route                                     | Risk                                          | How it is closed                                                                                      |
+| ----------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Claude switches a profile itself          | Claude widens its own permissions             | Commands are for the user. The mod registers no tool for switching.                                   |
+| Claude edits the mod's config or install  | The installed policy is rewritten             | Protected-paths deny on the covered write tools. The working-tree `hooks/` is unprotected on purpose. |
+| Claude sets the environment variable      | The profile set changes mid-session           | Not possible: the variable is read once, and a child cannot change its parent.                        |
+| Claude writes the variable into a profile | The next session starts in the wrong state    | Protected-paths deny on shell profiles. The band shows the state.                                     |
+| A repo grants itself permissions          | A project file pre-enables profiles           | Starting profiles come only from the user's environment.                                              |
+| Another mod submits a prompt as the user  | A skill-declared profile is triggered         | Install only trusted mods.                                                                            |
+| Chained or substituted Bash               | `gh issue edit 1 && rm -rf .` passes a prefix | Metacharacters make a prefix rule not match. Prefer typed tools.                                      |
+| A hook throws or times out                | The hook is skipped and the call runs         | `.catch` on every gating hook returns ask or deny.                                                    |
+| Auto mode                                 | An allow skips the classifier                 | Out of scope. Profiles do not loosen when the mode is known.                                          |
+| Deny rules                                | A mod cannot approve what a deny refuses      | Keep Bash out of deny. Use ask as the baseline.                                                       |
+| A forgotten profile                       | A standing permission                         | Names in the band, cleared on `/clear`, never restored on resume.                                     |
+| A subagent asks for more                  | Confused deputy                               | The parent decides, and non-delegable profiles go to the user.                                        |
+| Other write routes                        | PowerShell, NotebookEdit, symlinks            | Not closed yet.                                                                                       |
 
 The mod does not protect against anything a mod or program does outside Claude's tool calls.
 
@@ -245,6 +250,8 @@ Check each against the mods reference and its TypeScript declarations before bui
 | 13  | A mod can draw below the entry box                                                                                                                                                                                 | Otherwise the band stays above the prompt.                                                                                                |
 | 14  | A command can offer argument completion                                                                                                                                                                            | Decides how profile names are suggested.                                                                                                  |
 | 15  | A mod can tell when a skill starts and ends                                                                                                                                                                        | Needed for skill-declared profiles.                                                                                                       |
+| 16  | A mod's hook file can import sibling files (`./policy`, `./guards`)                                                                                                                                                | The split into `gate.ts`, `policy.ts`, `guards.ts` and the other modules depends on it. Otherwise they must be bundled into one file.     |
+| 17  | A mod has real file system access (Node `fs`): read the user config, create the log folder and append to the log                                                                                                   | The config loader and the log writer need it. Otherwise only a host file API, if any, can serve them.                                     |
 
 ## Later
 
@@ -276,7 +283,7 @@ Check each against the mods reference and its TypeScript declarations before bui
 
 ## Work plan
 
-1. **Verify.** Check Claude Code version, read the type declarations Claude Code provides and write a minimal hand-written `types/index.d.ts` from observed shapes, check assumptions 1 to 15 with a small probe mod, read the sec-default source.
+1. **Verify.** Check Claude Code version, read the type declarations Claude Code provides and write a minimal hand-written `types/index.d.ts` from observed shapes, check assumptions 1 to 17 with a small probe mod, read the sec-default source.
 2. **Build.** `policy.ts` with `decide` and tests first, then `register.ts`, then the commands, the band and the log.
 3. **Test.** Policy tables, protected paths, fail-closed, reset after `/clear`, band, CI with `claude plugin validate` and `claude plugin test`.
 4. **Publish.** README with "what it can reach" and "what it allows", SECURITY.md, CHANGELOG, licence, topics, awesome-list submission.

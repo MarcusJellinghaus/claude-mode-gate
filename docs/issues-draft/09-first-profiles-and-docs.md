@@ -9,6 +9,7 @@ This is Draft 09 of 11 (plan: Draft 00). It ships the first two profiles and the
 ## Design decisions this issue relies on
 
 - Git writes (`add`, `commit`, `push`, `checkout -b`) are not in the baseline. The `git-write` profile allows them. All other Bash asks.
+- The baseline asks for `npm ci` and `npm install` with the anchored match (Draft 03): only at the start of the command or after `&&`, `;` or `|`, never inside a commit message or other argument. Deny rules and profile ask rules use the loose substring match. The allow rules of `git-write` stay strict (any metacharacter means no match).
 - An allow rule for Bash is strict. An exact rule matches by equality, a prefix rule by `startsWith`, and neither matches a command that has any of `& ; | $ ( ) \` < >`or a newline. So`git commit -m x && rm -rf .`does not match`Bash(git commit *)`.
 - The v1 grammar cannot say "git push, but not with `--force`". A mid-string `*` is a rule error. A bare `--force` deny would also match unrelated commands such as `rm --force`. A prefix allow `git push *` would let `git push origin main --force` through. So `git-write` allows only **exact** push forms; every other push falls through and asks (source `bash-downgrade`). Parameterised profiles (a later item in the design) can widen this.
 - Issue and GitHub work uses typed mcp-workspace tools, not Bash text. Version 1 matches MCP tools by whole-tool name, so arguments cannot be restricted (`reference_name`, `state: closed`). Matching by argument (for example `issues 123`) is later.
@@ -37,6 +38,11 @@ Define `git-write` and `issues`, and document what the mod can reach and what it
   - `/gate-explain` with Bash text (`/gate-explain Bash git commit -m "x"`), with JSON input (`/gate-explain mcp__mcp-workspace__edit_file {"file_path": ".claude/settings.json"}`) and with `--agent <id>`. These are copied from Draft 08's test rows.
   - `npm run replay -- <transcript.jsonl> [--profiles a,b]`, with the exactness notes (below). No fixture-based test row covers it, so it is a manual example and the README marks it so.
 - README states that a commit message, or any Bash command, containing a shell metacharacter (`& ; | $ ( ) \` < >`or a newline) does not match an allow rule, so it asks. A subagent's unmatched Bash call is denied (decision-order step 1), and a headless run turns the ask into a deny (when headless is detectable). Example:`git commit -m "a;b"` asks (a row in the table below).
+- README states the baseline asks and the memory prompts (also in SECURITY.md where it lists the ask tier):
+  - The mod asks for `npm ci` and `npm install` because they run install scripts. The ask is anchored: it fires when the command starts with them or when they follow `&&`, `;` or `|`, not when the text sits inside a commit message or another argument (`git commit -m "fix npm install bug"` does not ask). A Claude Code allow rule in `settings.json`, such as this repo's `Bash(npm ci)`, does not override the mod's ask while the mod is active.
+  - Claude Code's auto-memory (`~/.claude/projects/*/memory/**`) lies under `~/.claude/**`, so every memory write asks. This is by design; there is no exception.
+  - The README and SECURITY.md say that the mod protects the installed copy (the config, the log folder, the installed plugin folder, the settings files and shell profiles) from the covered write tools, and never claim that Claude cannot rewrite "the policy" in general: the working-tree `hooks/` is deliberately unprotected.
+  - The skills' advice to stage explicit paths (never `git add -A`) is advice, not enforcement: `git-write` allows `git add *`, and the v1 grammar cannot tell `git add .` from `git add file`. No deny is added.
 - README "what it can reach" states:
   - the baseline's reach: all reads, ALL mcp-workspace write tools (`edit_file`, `save_file`, `append_file`, `move_file`, `delete_this_file`, `delete_directory`; deletes of untracked files cannot be undone), the fixed `npm run` check scripts, Skill and Agent, and web fetch and search (which can leak data and carry injected instructions);
   - what each built-in profile adds: `git-write` the git writes above, `issues` the GitHub writes above;
@@ -74,31 +80,35 @@ Parameterised profiles (`issues 123`, wider push forms). A typed commit and push
 - [ ] Both profiles pass `/gate-check` with no findings.
 - [ ] Rows through `decide` with `git-write` active. Claude Code's own verdict is UNAVAILABLE in the main table, so an unmatched Bash call asks with source `bash-downgrade`. Allow-matched rows are also run once with Claude Code's verdict `allow`: an active allow rule overrides a Claude Code `ask` (so `git commit -m "x"` is still `allow`) but never a deny. Add one row where Claude Code's verdict is `deny` for `git push` (result `deny`, from Claude Code) and one where it is `allow` for `git push origin main` (result `ask`, `bash-downgrade`).
 
-  | Command                        | Verdict | Why                         |
-  | ------------------------------ | ------- | --------------------------- |
-  | `git push`                     | allow   | exact                       |
-  | `git push -u origin HEAD`      | ask     | not an exact form           |
-  | `git push --force-with-lease`  | ask     | not an exact form           |
-  | `git push origin main`         | ask     | not an exact form           |
-  | `git push origin main --force` | ask     | not an exact form           |
-  | `git push --force`             | ask     | not an exact form           |
-  | `git push -f`                  | ask     | not an exact form           |
-  | `git commit -m "x"`            | allow   | prefix                      |
-  | `git commit -m "a;b"`          | ask     | metacharacter               |
-  | `git commit -m x && rm -rf .`  | ask     | metacharacter               |
-  | `git add . && git push`        | ask     | metacharacter               |
-  | `git commit -F msg.txt`        | allow   | prefix                      |
-  | `git commit -m "x <a@b.c>"`    | ask     | metacharacter               |
-  | `git commit -m "Fix x (y)"`    | ask     | metacharacter (parentheses) |
-  | `git commit -F - <<'EOF'`      | ask     | metacharacter               |
+  | Command                               | Verdict | Why                                                                                      |
+  | ------------------------------------- | ------- | ---------------------------------------------------------------------------------------- |
+  | `git push`                            | allow   | exact                                                                                    |
+  | `git push -u origin HEAD`             | ask     | not an exact form                                                                        |
+  | `git push --force-with-lease`         | ask     | not an exact form                                                                        |
+  | `git push origin main`                | ask     | not an exact form                                                                        |
+  | `git push origin main --force`        | ask     | not an exact form                                                                        |
+  | `git push --force`                    | ask     | not an exact form                                                                        |
+  | `git push -f`                         | ask     | not an exact form                                                                        |
+  | `git commit -m "x"`                   | allow   | prefix                                                                                   |
+  | `git commit -m "a;b"`                 | ask     | metacharacter                                                                            |
+  | `git commit -m x && rm -rf .`         | ask     | metacharacter                                                                            |
+  | `git add . && git push`               | ask     | metacharacter                                                                            |
+  | `git commit -F msg.txt`               | allow   | prefix                                                                                   |
+  | `git commit -m "x <a@b.c>"`           | ask     | metacharacter                                                                            |
+  | `git commit -m "Fix x (y)"`           | ask     | metacharacter (parentheses)                                                              |
+  | `git commit -F - <<'EOF'`             | ask     | metacharacter                                                                            |
+  | `git commit -m "fix npm install bug"` | allow   | prefix; the anchored baseline ask for `npm install` does not match text inside a message |
+  | `npm install`                         | ask     | baseline anchored ask (source `rule`, profile `baseline`)                                |
+  | `echo "npm install"`                  | ask     | not matched by the anchored ask; unmatched Bash (`bash-downgrade`)                       |
 
-- [ ] The ask rows above come from `bash-downgrade`. With `git-write` off, every row asks.
+- [ ] The ask rows above come from `bash-downgrade`, except `npm install`, which comes from the baseline ask rule (source `rule`). The `git commit -m "fix npm install bug"` row is also run with `git-write` off (ask, `bash-downgrade`, not `rule`) and with Claude Code's verdict `ask` (still `allow` with `git-write` on: the baseline ask does not fire). With `git-write` off, every row asks.
 - [ ] Each of the eight `issues` tools is allowed with `issues` active. With it off, the six writes ask (source `default`, unmatched non-Bash). `github_label_list` and `github_subissue_list` are not in the baseline, so with `issues` off they also ask (source `default`), and with it on they are allowed. Rows cover both reads in both states. The list matches the real mcp-workspace tool names.
 - [ ] README "what it can reach" and "what it allows" and SECURITY.md state every gap and limit in Scope (the directory containment limit as defined there), and the README says the mod is built for the default permission modes.
 - [ ] README "what it can reach" has the defined content in Scope (baseline reach including all mcp-workspace write tools and deletes, each profile's additions, the unprotected known gaps).
 - [ ] README documents the `mode-gate-profiles:` marker and the Subagents behaviour listed in Scope, including the Bash-only enforcement limit.
 - [ ] README documents the token-join spacing limit of `/gate-explain`, and the exactness limits of explain and replay.
 - [ ] README and SECURITY.md document the conditional limitations for assumptions 2, 10, 11 and 12 (inert subagent-Bash deny; inert marker with baseline-only subagents; no claim that `bypassPermissions` agents are gated; inert headless ask-to-deny conversion), worded from the Status column of the assumptions table with the mapping in Scope (`verified` as fact, `documented` as "documented but not observed", `partial` with its fallback, `failed` as limitation and fallback, `unknown` as "not yet known").
+- [ ] README (and SECURITY.md for the ask tier) state: `npm ci` and `npm install` ask because they run install scripts, with the anchored behaviour (a commit message containing the text does not ask), and a Claude Code allow rule in `settings.json` does not override the mod's ask while the mod is active; every write to Claude Code's auto-memory (`~/.claude/projects/*/memory/**`) asks, by design, with no exception; the protection is of the installed copy, with no claim that Claude cannot rewrite "the policy" in general (the working-tree `hooks/` is unprotected on purpose); staging explicit paths in the skills is advice, not enforcement, because `git-write` allows `git add *`.
 - [ ] README states the headless behaviour: profiles are fixed at start through `MODE_GATE_PROFILES`; a call that would ask because of an active rule, a guard, the Bash downgrade or malformed input is denied with a message naming the profile that would allow it (when detectable); an ask with source `default` or `claude-code` stays an ask and Claude Code resolves it.
 - [ ] README states that a Bash command (a commit message included) with a shell metacharacter (`& ; | $ ( ) \` < >` or a newline) does not match an allow rule, so it asks; a subagent's unmatched Bash call is denied (decision-order step 1); a headless run turns the ask into a deny (when headless is detectable).
 - [ ] README has `/gate-explain` examples (Bash text, JSON input, `--agent`) copied from Draft 08's test rows, and the `npm run replay -- <transcript.jsonl> [--profiles a,b]` example marked as manual (no fixture-based test row), with the exactness notes.
