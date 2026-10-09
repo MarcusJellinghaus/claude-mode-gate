@@ -13,23 +13,26 @@ This is Draft 04 of 13 (plan: Draft 00). It holds the per-session state and the 
   - `session.end` (fires for `/clear` with reason `clear`, and **no** `session.start` follows): resets the state, whatever the reason (below). The end-of-session clock is short (1.5 s for every hook), so the reset only writes `$.state` and never loads files.
   - `command.run` with the matcher `{ command: 'gate-on' }` and so on for `gate-off`, `gate-status` and `gate-check`: the hook gets `e.args` (the raw argument text, `""` when none) and returns `{ text }`. Draft 07 registers `/gate-why`, Draft 08 `/gate-explain`.
 - **State (this draft owns the shape).** `$.state` (per session, survives a hot reload; never `$.store`, never module variables). Everything lives under one literal key `gate` of this mod, so `validate` can list it; only the owning plugin writes it. The fields, which Drafts 06, 07 and 12 use by exactly these names:
-  - `gate.config`: the loaded config (the `loadConfig` result), or unset until first use.
-  - `gate.active`: array of active profile names in switch-on order.
-  - `gate.started`: boolean; true once the state has started or been reset. Starting profiles apply only while it is false (Draft 12).
-  - `gate.headless`: boolean, set from `session.start.isInteractive` (Draft 12).
-  - `gate.logFailing`: boolean, set and cleared by the log (Draft 07), read by `/gate-status`.
-  - `gate.seenIds`: the log's dedupe list (Draft 07), bounded to 200 ids.
-  - `gate.assignments`: bound subagent assignments (Draft 06).
-  - `gate.pending`: pending assignment records (Draft 06).
+  - `gate.config`: the loaded config (the `loadConfig` result), optional, unset until first use.
+  - `gate.active`: `string[]`, profile names in switch-on order. Initial value `[]`.
+  - `gate.started`: boolean; true once the state has started or been reset. Initial value `false`. Starting profiles apply only while it is false (Draft 12).
+  - `gate.headless`: boolean, optional, set from `session.start.isInteractive` by Draft 12. Unset means `false` (not headless). This assumes `session.start` precedes the first tool call; a lazy load cannot read `isInteractive` (only `session.start` carries it), so it leaves the flag alone.
+  - `gate.logFailing`: boolean, optional, set and cleared by the log (Draft 07), read by `/gate-status`. Unset means `false`.
+  - `gate.seenIds`: the log's dedupe list (Draft 07), bounded to 200 ids. This draft declares it as `string[]`, optional, unset at the start.
+  - `gate.assignments`: bound subagent assignments. This draft declares it loosely typed and optional (`Record<string, unknown>`); Draft 06 narrows the element type. Unset at the start.
+  - `gate.pending`: pending assignment records. Declared loosely typed and optional (`Record<string, unknown>`); Draft 06 narrows it. Unset at the start.
+
+  So the initial state is `{ active: [], started: false }` and every other field is unset.
 
   The session id (`$.session.id()`) and the working directory (`$.session.cwd()`, the `cwd` given to `loadConfig`) are read when needed, not stored, because the id changes on `/clear`.
 
 - **Types.** The engine supplies the API types. The mod only needs its own `PluginState` contract in `types/index.d.ts`, declaring `gate` under the mod's name, named in `.claude-plugin/plugin.json` as `"types": "./types/index.d.ts"`. It is merged into the engine's `PluginState` through `declare module "claude-code"`. Draft 01 settles how `typecheck` finds the engine's types.
 - **Start, reset, lazy load.**
-  - Start: `session.start` with `gate.started` false (or `gate` missing) loads the config and sets `started`. This draft starts with `active: []`; Draft 12 extends the start to apply `startProfiles`. A hot reload finds `started` true and leaves the active profiles alone.
-  - Reset: `session.end` (any reason) sets `active` to none, clears `assignments`, `pending` and `seenIds`, unsets `config` (the next hook reloads it) and sets `started` to true, so starting profiles are not re-applied: after `/clear` no profile is active, even one that `MODE_GATE_PROFILES` started. `logFailing` and `headless` are kept (the log file outlives the session's profiles). In-process resume also ends a session, so profiles from an earlier session never come back.
+  - Start (the one definition of the transition): `session.start` with `gate.started` false (or `gate` missing) loads the config, sets `started` to true and sets `active` to `[]`. Draft 12 extends only the last part (`active` becomes `startProfiles` when the config is ok). A hot reload finds `started` true and leaves the active profiles alone.
+  - Reset: `session.end` (any reason) sets `active` to none, clears `assignments`, `pending` and `seenIds`, unsets `config` (the next hook reloads it) and sets `started` to true, so starting profiles are not re-applied (Draft 12 tests the `MODE_GATE_PROFILES` case). `logFailing` and `headless` are kept (the log file outlives the session's profiles). In-process resume also ends a session, so profiles from an earlier session never come back.
   - Lazy load: if `gate` or `gate.config` is missing (a hook firing before `session.start`, or after a reset), the first use loads the config through `loadConfig`. A lazy load restores the definitions only, never applies `startProfiles`, and leaves `started` as it found it. Until the user switches profiles on, only the baseline is active.
-- **Pure module `hooks/commands.ts`.** The logic lives here, not in `register.ts`: the start and reset transitions (plain state in, plain state out), argument parsing of the raw text, all-or-nothing validation, reserved names, the proposal hint, the "not active" note, the summary of what a profile allows, the `/gate-status` text and the usage texts. Its functions take the raw argument text and plain data (the current `gate`, the defined profiles, the project proposals) and return `{ active, message }` (or the new state), where `active` is unchanged on any error. They use no `$` and do no I/O, and import only types from `hooks/policy.ts`. `register.ts` only calls them from the hooks, stores the result in `$.state` and returns `{ text: message }`. Exact signatures are decided test-first.
+- **Loading the config from `register.ts`.** `loadConfig` runs in `session.start` (start), in the lazy load and in `/gate-check`, and needs an environment object and a file reader. `register.ts` builds them (Draft 02 defines their shape): the environment object comes from `$.env.get` on the literal names `MODE_GATE_PROFILES`, `MODE_GATE_CONFIG`, `XDG_CONFIG_HOME`, `HOME` and `USERPROFILE` (no other name is read), the reader is built on `$.fs` (`exists`, then `read`; `undefined` for a missing file), and `cwd` comes from `$.session.cwd()`. One small helper in `register.ts` does this for all three callers. Draft 12 reuses it and does not rebuild it.
+- **Pure module `hooks/commands.ts`.** The logic lives here, not in `register.ts`: the start and reset transitions (plain state in, plain state out), argument parsing of the raw text, all-or-nothing validation, reserved names, the proposal hint, the "not active" note, the summary of what a profile allows, the `/gate-status` text and the usage texts. Its functions take the raw argument text and plain data (the current `gate`, the defined profiles, the project proposals) and return `{ active, message }` (or the new state), where `active` is unchanged on any error. They use no `$` and do no I/O, and import only types from `hooks/policy.ts` and `hooks/config.ts` (the `loadConfig` result type held in `gate.config`, and the profile and proposal shapes). `register.ts` only calls them from the hooks, stores the result in `$.state` and returns `{ text: message }`. Exact signatures are decided test-first.
 - **Commands.**
   - `/gate-on <profile>...` switches profiles on and prints a short summary of what they allow. `all` and `baseline` are reserved names. With no arguments it prints usage and the available names. It is all-or-nothing: if any name is unknown or reserved, nothing changes, and all bad names are reported together with the list of valid names (built-ins and the user's profiles); if a bad name matches a project proposal in `.mode-gate.json`, it adds a note that project profiles are proposals to copy into the user config. Switching on an active profile is idempotent (no duplicate in `gate.active`).
   - `/gate-off <profile>...` switches them off; `all` switches every profile off. It is symmetrical: if any name is unknown, nothing changes and the unknown names are reported. A known but inactive name is not an error; it only prints a "not active" note. With no arguments it prints usage and the active profiles. Draft 06 extends it to revoke delegated copies and pending records.
@@ -46,7 +49,7 @@ This is Draft 04 of 13 (plan: Draft 00). It holds the per-session state and the 
 ## Existing code
 
 - `hooks/register.ts`: stub. Nothing may import it (`.dependency-cruiser.cjs` rule `no-import-of-register`). After this draft it holds the registrations above and only wires.
-- `hooks/commands.ts`: does not exist yet; this draft creates it. Add it to the `entry` list in `knip.json` if knip reports it unused before `register.ts` imports it. In `.dependency-cruiser.cjs` add a rule that `hooks/commands.ts` imports only types from `hooks/policy.ts`.
+- `hooks/commands.ts`: does not exist yet; this draft creates it. Add it to the `entry` list in `knip.json` if knip reports it unused before `register.ts` imports it. In `.dependency-cruiser.cjs` add a rule that `hooks/commands.ts` imports only types from `hooks/policy.ts` and `hooks/config.ts` (needs `tsPreCompilationDeps: true`, added by Draft 02).
 - `vitest.config.ts` (coverage include list: `hooks/policy.ts` and `hooks/config.ts`) and `stryker.config.json` (`mutate` list): add `hooks/commands.ts` to both, the same pattern as Drafts 05, 06, 07 and 08 use for their pure modules.
 - `hooks/hooks.json` (manifest shape fixed by Draft 01), `.claude-plugin/plugin.json` (gets the `types` entry), `types/index.d.ts`.
 - `tests/`: vitest. `CLAUDE.md` "Testing strategy" item 4: wiring tests cover fail-closed, the reset test (after `/clear` no profile stays active) and the band test.
@@ -59,7 +62,8 @@ Hold per-session profile state that survives a hot reload and resets on `/clear`
 
 - The `gate` state shape, the `PluginState` contract in `types/index.d.ts` and the `types` entry in `plugin.json`.
 - `session.start` (register commands, start the state once), `session.end` (reset), the lazy config load, and the four `command.run` hooks with their `.catch`.
-- The new pure module `hooks/commands.ts`, table-tested directly, and its gates: coverage include list in `vitest.config.ts` (keep 95%), the `mutate` list in `stryker.config.json`, and a dependency-cruiser rule (imports only types from `policy.ts`).
+- The new pure module `hooks/commands.ts`, table-tested directly, and its gates: coverage include list in `vitest.config.ts` (keep 95%), the `mutate` list in `stryker.config.json`, and a dependency-cruiser rule (imports only types from `policy.ts` and `config.ts`).
+- The environment object, `$.fs` reader and `cwd` that `register.ts` hands to `loadConfig` (see Loading the config).
 - `/gate-on`, `/gate-off`, `/gate-status`, `/gate-check`.
 - Invalid-config handling.
 
@@ -72,7 +76,9 @@ The shared decision path, `tool.call` and `tool.check` wiring, starting profiles
 - [ ] `$.state` holds everything under the one literal key `gate` with the fields `config`, `active`, `started`, `headless`, `logFailing`, `seenIds`, `assignments` and `pending`; nothing else is stored in `$.state` or `$.store`; `types/index.d.ts` declares exactly these as `PluginState` and `plugin.json` names the file in `types`.
 - [ ] The session id and working directory are read from `$.session` when needed and are not stored in `gate` (a test or review check on the state shape).
 - [ ] Reset test: after `session.end` (reason `clear`, and any other reason) `gate.active` is empty, `assignments`, `pending` and `seenIds` are cleared, `config` is unset, `started` is true and `logFailing` is unchanged; the next hook reloads the config.
-- [ ] After a reset no profile is active, including one that was active before; a resumed session has no profile that was switched on in an earlier session.
+- [ ] After a reset no profile is active, including one that was active before; a resumed session has no profile that was switched on in an earlier session. (The case of a profile that `MODE_GATE_PROFILES` started is tested in Draft 12.)
+- [ ] Initial state: a first `session.start` leaves `{ active: [], started: true }` with the config loaded, and every other field unset; `headless` unset reads as false (a test with a hook before `session.start`).
+- [ ] Wiring test: `register.ts` builds the environment object from `$.env.get` with exactly the five literal names, builds the `$.fs` reader (missing file gives `undefined`) and passes `$.session.cwd()` to `loadConfig`, in `session.start`, the lazy load and `/gate-check`.
 - [ ] Hot reload test: a second `session.start` with `started` true leaves `gate.active`, `assignments` and `pending` unchanged and re-registers the commands; no module variable holds state.
 - [ ] With `gate` or `gate.config` missing (a hook before `session.start`, or after a reset), the first use loads the config through `loadConfig`; a lazy load never applies `startProfiles` and does not change `started`. With the state missing or wiped only the baseline is active.
 - [ ] `session.start` registers `gate-on`, `gate-off`, `gate-status` and `gate-check` with `immediate: true`, a description and an `argumentHint` where the command takes arguments, and returns `next(e)`.
@@ -96,7 +102,7 @@ The shared decision path, `tool.call` and `tool.check` wiring, starting profiles
 - [ ] Config edits made after the config loaded do not change the active rules until the next reset.
 - [ ] Invalid config (`ok: false`): only the baseline is active, `/gate-on` activates nothing and says why, and `/gate-status` and `/gate-check` show the errors.
 - [ ] No tool callable by Claude switches profiles (no `$.tool.register` in `register.ts`).
-- [ ] Gates: `hooks/commands.ts` is in the coverage include list of `vitest.config.ts` (`npm run test:coverage` reaches 95% on it and still on the other listed modules) and in the Stryker `mutate` list (`npm run test:mutation` stays above the `break` threshold of 75); a dependency-cruiser rule makes it import only types from `hooks/policy.ts` (`npm run arch` passes); it uses no `$`.
+- [ ] Gates: `hooks/commands.ts` is in the coverage include list of `vitest.config.ts` (`npm run test:coverage` reaches 95% on it and still on the other listed modules) and in the Stryker `mutate` list (`npm run test:mutation` stays above the `break` threshold of 75); a dependency-cruiser rule makes it import only types from `hooks/policy.ts` and `hooks/config.ts` (`npm run arch` passes); it uses no `$`.
 - [ ] `npm run check` passes.
 
 ## How to start
