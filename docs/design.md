@@ -97,7 +97,7 @@ The path guards are extra sources fed into this order, not overrides: a protecte
 | ------------------------ | ---------------------------------------------------------------------------------------------- |
 | `/gate-on <profile>...`  | Switch profiles on. Prints a short summary of what they allow.                                 |
 | `/gate-off <profile>...` | Switch profiles off. `all` switches every profile off.                                         |
-| `/gate-status`           | Baseline summary, active profiles and the config path in use.                                  |
+| `/gate-status`           | Baseline summary, active profiles, config path in use, and `log: failing` if writes fail.      |
 | `/gate-why [n]`          | The last n verdicts with the rule and profile that fired.                                      |
 | `/gate-check`            | Validate the config: conflicts, unknown tools, over-broad rules. Also lists project proposals. |
 | `/gate-explain <tool> …` | Dry run one call and show the verdict and the rule chain.                                      |
@@ -158,9 +158,10 @@ Covered tools: the mcp-workspace write tools (`edit_file`, `save_file`, `append_
 
 ## Decision log
 
-- The mod writes a log file in the folder named by the config key `logDir` (default `logs`), resolved relative to the session's project directory; an absolute path is allowed.
-- Each entry has a timestamp, the verdict, the rule and profile that fired, the agent and the tool name. It records no arguments.
-- `/gate-why` reads the log. Replay uses session transcripts, not the log.
+- The mod appends to `mode-gate.log.jsonl` in the folder named by the config key `logDir` (default `logs`), resolved relative to the session's project directory; an absolute path is allowed. The folder is created if missing. The mod writes the file itself, not through a tool call. A failed write is swallowed and `/gate-status` shows `log: failing` until the next successful write.
+- One JSON object per line with the fields `time` (ISO 8601), `verdict`, `source`, `rule` (the matched rule, or null), `profile` (or `baseline`, or null), `agent` (`main` unless the call is a subagent call, then the agent id), `tool`, `toolCallId` (if the event carries one) and `session` (if the API provides one). It records no arguments.
+- A call seen by both gating hooks is logged once, by tool-call id, with the last 200 ids kept in session state. Without an id it may be logged twice.
+- `/gate-why [n]` (n a positive integer, default 10) reads the log and shows this session's entries when entries carry a session id, otherwise the last n of all sessions. Replay uses session transcripts, not the log.
 
 ## Failure
 
@@ -171,7 +172,7 @@ Every gating hook has a `.catch` handler that fails closed (never allow): `tool.
 - `policy.ts`: pure decision logic. No `$`, no state, no imports.
 - `register.ts`: thin event wiring.
 - TypeScript in strict mode.
-- State lives in `$.state` (per session), never in `$.store`.
+- State lives in `$.state` (per session), never in `$.store`, all under one key `gate`: `config`, `active` (profile names in switch-on order), `sessionId`, `logFailing`, `seenIds`, `assignments` and `pending`.
 
 ### Events
 

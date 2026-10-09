@@ -8,16 +8,37 @@ This is Draft 07 of 11 (plan: Draft 00). It makes the gate visible so a forgotte
 
 ## Design decisions this issue relies on
 
-- Data source: the shared decide path of Draft 04 returns the full decision (`verdict`, `source`, `rule?`, `profile?`) as well as the hook result. The log entries and `/gate-why` use the full decision. The band reads the active profile names (an array in switch-on order) from `$.state`.
+- Data source: the shared decide path of Draft 04 returns the full decision (`verdict`, `source`, `rule?`, `profile?`) as well as the hook result. The log entries and `/gate-why` use the full decision. The band reads `gate.active` (profile names in switch-on order) from `$.state`. The `gate` state shape is defined in Draft 04; this draft uses `gate.active`, `gate.config`, `gate.sessionId`, `gate.logFailing` and `gate.seenIds`.
 - Lifetimes: a profile switched on lasts the session; profiles are cleared on `/clear` and never restored on resume (profiles from an earlier session do not come back). "The band shows profile names, so a forgotten profile stays visible."
 - `ui.render` draws the active profiles in the band and keeps other mods' content.
-- Decision log: the mod writes a log file in the folder `logDir` from the `loadConfig` result (Draft 02: config key `logDir`, default `logs`, resolved against the project directory, absolute allowed; the result carries it also when the config failed). Each entry has a timestamp, the verdict, the rule and profile that fired, the agent and the tool name. It records no arguments, because arguments can hold secrets.
-- `/gate-why [n]` reads the log. Replay (Draft 08) uses session transcripts, not the log.
+- Decision log: the mod appends to the single file `<logDir>/mode-gate.log.jsonl`, where `logDir` comes from the `loadConfig` result (Draft 02: config key `logDir`, default `logs`, already resolved against the project directory, absolute allowed; the result carries it also when the config failed). Format: JSON Lines, one object per entry, with exactly these fields:
+  - `time`: ISO 8601.
+  - `verdict`, `source`: from the decision.
+  - `rule`: the matched rule's raw string, or null.
+  - `profile`: the profile name, `baseline` for baseline rules, or null.
+  - `agent`: `main` whenever Draft 04's subagent rule says the call is not a subagent call (a main-session id the event may carry is not used), otherwise the agent id. Draft 04 sets `call.agentId` only for a subagent call, so this is `call.agentId ?? "main"`. If assumption 2 fails, every call is `main`.
+  - `tool`: the tool name.
+  - `toolCallId`: only if the event carries one (needed for dedupe).
+  - `session`: only if a session id is available. Its source is the `session.start` event or a field on the hook events (Draft 01's spike notes which); Draft 04 records it as `gate.sessionId` and passes it to `log`.
+
+  Tool arguments and command text are never stored, because they can hold secrets.
+
+- Writing: the mod creates `logDir` recursively if missing and appends one line per entry (one write per entry) itself through the file API, not through a tool call. The real `log` catches its own write errors and sets `gate.logFailing = true`; `/gate-status` (Draft 04) then shows `log: failing`. The next successful write sets it to false. Draft 04's shared path also wraps the `log` call, so any other throw is swallowed and never changes the verdict. `/clear` does not reset it, because the log file outlives the session's profiles.
+- Dedupe state: the set of seen tool-call ids is `gate.seenIds` (per session, never a module variable), bounded to the last 200 ids. Without a tool-call id a call may be logged twice; this limit is documented.
+- `/gate-why [n]` reads the log file; default n is 10. n must be a positive integer; anything else (0, negative, non-numeric) prints usage and uses the default. If a session id is available, it shows only this session's last n entries; entries without a session id are excluded. If none is available (entries omit `session`), it shows the last n entries of all sessions and says so (concurrent sessions share the folder). It parses JSON Lines and skips malformed lines. An absent `rule` or `profile` is shown as `-`. Replay (Draft 08) uses session transcripts, not the log.
+- Band text above the prompt, from `gate.active`:
+
+  | State                 | Text                              |
+  | --------------------- | --------------------------------- |
+  | No profile active     | `gate: baseline`                  |
+  | Profiles active       | `gate: baseline + <names>`        |
+  | Config failed to load | `gate: baseline (config invalid)` |
+
 - The log folder is a protected path: Edit and Write are denied there (Draft 05, which takes `logDir` from the guard context Draft 04 passes), so Claude cannot erase its own trail.
-- **This draft owns the real `log(decision, call)`** that plugs into the injected stub of Draft 04's shared decide path, the single logging point. `tool.call` calls it only for a deny; `tool.check` calls it for every verdict it returns. If both hooks fire for one call (Draft 01's finding on assumption 2), `log` writes one entry per tool-call id when the event carries one. Without a tool-call id it cannot deduplicate and may write two entries.
-- The `call` is `{ toolName, input, agentId?, toolCallId? }` (the tool name, the tool input, the agent id and tool-call id when the event carries them), built by Draft 04. `log` writes only `toolName`, `agentId` and `toolCallId` from it, never `input`.
-- Failure: every gating hook fails closed. A throwing `log` is swallowed by the shared path (Draft 04) and never changes the verdict: the verdict is computed first and the `log` call is wrapped. A logging error must not turn a deny into an allow.
-- Unverified: assumption 13 (a mod can draw below the entry box). If it fails, the band stays above the prompt. Assumption 5 (state per session) affects any in-memory log buffer.
+- **This draft owns the real `log(decision, call, sessionId?)`** (exact signature open) that plugs into the injected stub of Draft 04's shared decide path, the single logging point. `tool.call` calls it only for a deny; `tool.check` calls it for every verdict it returns. If both hooks fire for one call (Draft 01's finding on assumption 2), `log` writes one entry per tool-call id when the event carries one. Without a tool-call id it cannot deduplicate and may write two entries.
+- The `call` is `{ toolName, input, agentId?, toolCallId? }` (the tool name, the tool input, the agent id only for a subagent call, the tool-call id when the event carries one), built by Draft 04. `log` writes only `toolName`, `agentId` and `toolCallId` from it, never `input`. The session id comes from the shared path as a separate argument (read from `gate.sessionId`, where Draft 04 recorded it at `session.start`), not from `call`.
+- Failure: every gating hook fails closed. The verdict is computed first, so a logging error must not turn a deny into an allow (see Writing above).
+- Unverified: assumption 13 (a mod can draw below the entry box). If it fails, the band stays above the prompt. Assumption 5 (state per session) affects `gate.seenIds` and `gate.logFailing`.
 
 ## Existing code
 
@@ -31,31 +52,34 @@ Show the active profiles in the band, record every verdict, and let the user rea
 
 ## Scope
 
-- Band text from the active profile names; none active shows that.
-- The real `log(decision, call)` with dedupe by tool-call id.
-- Log entry formatting as a pure function; the file write stays in `register.ts` (or a small adapter).
+- Band text from the active profile names and the config state (see the table above).
+- The real `log(decision, call, sessionId?)` with dedupe by tool-call id in `gate.seenIds`.
+- Log entry formatting and `/gate-why` line parsing as pure functions; the file write stays in `register.ts` (or a small adapter).
 - Log folder read from the `logDir` of the `loadConfig` result (no separate setting); add `logs` to `.gitignore` if missing.
+- `gate.logFailing`: set by `log` on a failed write, cleared on the next successful write, not reset by `/clear`, and read by `/gate-status` (one line added in Draft 04).
 - `/gate-why [n]`, registered by this draft (Draft 04 registers the other commands except `/gate-explain`, which Draft 08 registers).
 
 ## Out of scope / later
 
 A log with arguments (with credentials masked). Log rotation.
 
-## Open questions
-
-- Default n for `/gate-why`? Recommend 10.
-- Log format: JSON lines (recommended, easy to parse) or text?
-
 ## Acceptance criteria
 
-- [ ] The band lists the active profile names and updates after `/gate-on` and `/gate-off`.
-- [ ] With no profile active, the band says so.
+- [ ] With profiles active, the band reads `gate: baseline + <names>` in switch-on order, and updates after `/gate-on` and `/gate-off`.
+- [ ] With no profile active, the band reads `gate: baseline`; with a failed config it reads `gate: baseline (config invalid)`.
 - [ ] Other mods' band content is kept.
-- [ ] Each verdict adds one entry with exactly: timestamp, verdict, rule, profile, agent, tool name.
+- [ ] The log file is `<logDir>/mode-gate.log.jsonl`. Each verdict adds one line of JSON with exactly the fields `time`, `verdict`, `source`, `rule`, `profile`, `agent`, `tool`, plus `toolCallId` only if the event carries one and `session` only if the API provides one. `rule` and `profile` are null when absent; `profile` is `baseline` for a baseline rule; `agent` is `main` for every call that is not a subagent call (also when the event carries a main-session id), otherwise the agent id.
+- [ ] A missing `logDir` is created recursively on the first write; entries are appended and earlier lines stay unchanged.
 - [ ] A call that reaches `log` from both `tool.call` (deny) and `tool.check` with the same tool-call id adds exactly one entry; a `tool.call` deny alone adds one entry.
+- [ ] `gate.seenIds` holds at most the last 200 ids (the 201st id evicts the oldest). Calls without a tool-call id are not deduplicated.
 - [ ] No entry contains tool input (test with a Bash command holding a fake secret).
-- [ ] `/gate-why` uses the default n, and honours an explicit n.
-- [ ] A log write failure (a throwing `log`) does not change the verdict: a deny stays deny and no error escapes the shared path.
+- [ ] `/gate-why` uses n = 10 by default, and honours an explicit positive integer n.
+- [ ] `/gate-why 0`, `/gate-why -3` and `/gate-why abc` print usage and show the default 10 entries.
+- [ ] When a session id is available, `/gate-why` shows only this session's entries (the session id is `gate.sessionId`, passed to `log` as `sessionId`). Without one, entries omit `session` and `/gate-why` shows the last n of all sessions and says so. It skips malformed lines and shows an absent rule or profile as `-`.
+- [ ] With a session id available, `/gate-why` excludes entries that have no `session` field (a log with old or foreign entries without one).
+- [ ] A failing file write sets `gate.logFailing` (the real `log` catches the error itself), does not change the verdict and lets no error escape; `/gate-status` then shows `log: failing`.
+- [ ] A `log` that throws for another reason is swallowed by the shared path (Draft 04): a deny stays deny and no error escapes.
+- [ ] `gate.logFailing` is cleared by the next successful write, and `/clear` leaves it set (test: fail a write, `/clear`, `/gate-status` still shows `log: failing`; then a successful write clears it).
 - [ ] The log is written to the `logDir` of the `loadConfig` result: `logs` by default, a custom relative or absolute value when set, and `logs` also when the config failed to load.
 - [ ] The log folder is denied for Edit and Write (also a custom `logDir`, via the guard context).
 - [ ] Tests use an injected clock and a temp folder.
