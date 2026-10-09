@@ -79,6 +79,7 @@
       "Bash(git push * -f)"
     ]
   },
+  "attribution": { "commit": "", "pr": "" },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": ["mcp-workspace"]
 }

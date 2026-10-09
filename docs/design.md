@@ -66,7 +66,7 @@ Always on:
 
 The Ask and Deny bullets are implemented as path guards (Draft 05), not as profile rules: the v1 rule grammar has only whole-tool and Bash prefix rules, so it cannot say "edit tool, but only for this path".
 
-Not in the baseline: git writes (`add`, `commit`, `push`, `checkout -b`). A `git-write` profile allows `git add`, `git commit` and `git checkout -b` as prefix rules, and `git push` only in the exact forms `git push`, `git push -u origin HEAD` and `git push --force-with-lease`. The v1 grammar cannot deny `--force` without over-matching, nor allow a push prefix without letting `--force` through, so every other push asks; parameterised profiles (see [Later](#later)) can widen this. Both built-in profiles are delegable. All other Bash asks.
+Not in the baseline: git writes (`add`, `commit`, `push`, `checkout -b`). A `git-write` profile allows `git add`, `git commit` and `git checkout -b` as prefix rules, and `git push` only in the exact form `git push` (new branches need `git config push.autoSetupRemote true`). The v1 grammar cannot deny `--force` without over-matching, nor allow a push prefix without letting `--force` through, so every other push asks, force pushes and `git push -u origin HEAD` included; parameterised profiles (see [Later](#later)) can widen this. Both built-in profiles are delegable. All other Bash asks.
 
 ### Decision order
 
