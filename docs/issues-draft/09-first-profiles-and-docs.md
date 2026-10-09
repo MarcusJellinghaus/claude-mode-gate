@@ -51,6 +51,7 @@ Parameterised profiles (`issues 123`). A typed commit and push tool.
 - [ ] The `issues` tool list matches the real mcp-workspace write tools.
 - [ ] The non-delegable decision is in `docs/design.md` and enforced by Draft 06.
 - [ ] README states the permission-mode limit and the known write-route gap.
+- [ ] README states the subagent limit: the deny for unassigned rules is Bash-only, and an unmatched non-Bash subagent call keeps Claude Code's verdict.
 - [ ] README examples run as written.
 - [ ] CHANGELOG.md is updated.
 - [ ] `npm run docs:lint`, `npm run check:docs` and `npm run check` pass.
