@@ -170,6 +170,10 @@ registration (a second throws).
 Re-entry: a `$` call a hook makes can raise the same event beneath the hook's own
 frame; the hook is not run again there, and its `.catch` is asked instead
 (`next.error.kind === 're-entry'`). A guard needs a handler that denies there too.
+That is the API author's advice. claude-mode-gate does not follow it: it passes a
+re-entrant event through with `next(e)`, because the nested event is its own `$`
+call and denying would block its own reads and writes (see design.md, "Failure";
+spike row 19 decides).
 
 Module that fails to load: the docs do not say "everything ungated"; they say a
 failed hook or module is reported, not silent. While the session hot-reloads the
