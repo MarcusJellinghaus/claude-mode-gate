@@ -110,7 +110,7 @@ Known impacts to start from:
 
 - Assumption 2, no agent id, or main-session and subagent calls not distinguishable: subagent profiles (Draft 06) cannot be enforced per agent, and every call counts as main-session, so the subagent-Bash deny (Draft 03 and 04) is inert. Say what is dropped. If `tool.check` still fires for a call that `tool.call` denied, Draft 04 and 07 log that call once, by tool-call id.
 - Assumption 10: the launch is not visible, no event or field gives the new subagent's agent id, or that event carries no `toolCallId` or other value linking it to the Agent call: no assignment can be tied to an agent (matching by arrival order is not allowed), so subagents get the baseline only (Draft 06). Say what is dropped.
-- Assumption 11: `bypassPermissions` agents skip the mod and cannot be gated, so stop and ask (Draft 06); Draft 10 must stop using them.
+- Assumption 11: `bypassPermissions` agents skip the mod and cannot be gated, so stop and ask (Draft 06). Draft 10 also stops and asks at once, without waiting for Drafts 06 and 09, and must not leave the three agents running ungated.
 - Assumption 12: if hooks do not run under `claude -p`, headless runs are unsupported. If they run but headless cannot be detected, the ask-to-deny conversion is inert (Draft 04) and Claude Code resolves asks itself.
 
 If `CLAUDE_CONFIG_DIR` is not supported (step 4), stop and ask. Do not probe against the live config.

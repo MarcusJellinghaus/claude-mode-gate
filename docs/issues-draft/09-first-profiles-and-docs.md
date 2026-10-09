@@ -60,7 +60,8 @@ Define `git-write` and `issues`, and document what the mod can reach and what it
   - the working tree's `hooks/`, `types/` and `.claude-plugin/` are deliberately unprotected, so the mod can be developed with itself active, although `npm run test` and `npm run check` execute them;
   - `git-write` allows only the exact push forms listed; other pushes ask. `git push --force-with-lease` is allowed because the rebase workflow uses it, but it is a force push that can overwrite remote history. Every other force form does not match an allow rule, so it asks (a subagent's unmatched Bash call is denied, decision-order step 1; a headless run turns the ask into a deny, when headless is detectable). The docs must not claim that force pushes are blocked or that `--force-with-lease` asks;
   - `issues` cannot restrict arguments: `reference_name` (a write to another repository) and `state: closed` pass (README "what it allows" says so);
-  - the mod is built for the default permission modes.
+  - the mod is built for the default permission modes;
+  - a commit message containing `<` or `>` (for example the Co-Authored-By trailer), or passed by heredoc, does not match `git-write`'s allow rule and asks; the workaround is `git commit -F <path>` with the message written by the MCP file tool. Only the command line is matched, so the file may hold the Co-Authored-By trailer, a blank line and several lines (Draft 10 uses it in the supervisor skills).
 - Draft 09 owns the README and SECURITY.md text. Drafts 05 and 06 only supply documentation acceptance criteria that this text must satisfy.
 
 ## Out of scope / later
@@ -73,19 +74,22 @@ Parameterised profiles (`issues 123`, wider push forms). A typed commit and push
 - [ ] Both profiles pass `/gate-check` with no findings.
 - [ ] Rows through `decide` with `git-write` active. Claude Code's own verdict is UNAVAILABLE in the main table, so an unmatched Bash call asks with source `bash-downgrade`. Allow-matched rows are also run once with Claude Code's verdict `allow`: an active allow rule overrides a Claude Code `ask` (so `git commit -m "x"` is still `allow`) but never a deny. Add one row where Claude Code's verdict is `deny` for `git push` (result `deny`, from Claude Code) and one where it is `allow` for `git push origin main` (result `ask`, `bash-downgrade`).
 
-  | Command                        | Verdict | Why               |
-  | ------------------------------ | ------- | ----------------- |
-  | `git push`                     | allow   | exact             |
-  | `git push -u origin HEAD`      | allow   | exact             |
-  | `git push --force-with-lease`  | allow   | exact             |
-  | `git push origin main`         | ask     | not an exact form |
-  | `git push origin main --force` | ask     | not an exact form |
-  | `git push --force`             | ask     | not an exact form |
-  | `git push -f`                  | ask     | not an exact form |
-  | `git commit -m "x"`            | allow   | prefix            |
-  | `git commit -m "a;b"`          | ask     | metacharacter     |
-  | `git commit -m x && rm -rf .`  | ask     | metacharacter     |
-  | `git add . && git push`        | ask     | metacharacter     |
+  | Command                        | Verdict | Why                                       |
+  | ------------------------------ | ------- | ----------------------------------------- |
+  | `git push`                     | allow   | exact                                     |
+  | `git push -u origin HEAD`      | allow   | exact                                     |
+  | `git push --force-with-lease`  | allow   | exact                                     |
+  | `git push origin main`         | ask     | not an exact form                         |
+  | `git push origin main --force` | ask     | not an exact form                         |
+  | `git push --force`             | ask     | not an exact form                         |
+  | `git push -f`                  | ask     | not an exact form                         |
+  | `git commit -m "x"`            | allow   | prefix                                    |
+  | `git commit -m "a;b"`          | ask     | metacharacter                             |
+  | `git commit -m x && rm -rf .`  | ask     | metacharacter                             |
+  | `git add . && git push`        | ask     | metacharacter                             |
+  | `git commit -F msg.txt`        | allow   | prefix (the file may contain the trailer) |
+  | `git commit -m "x <a@b.c>"`    | ask     | metacharacter                             |
+  | `git commit -F - <<'EOF'`      | ask     | metacharacter                             |
 
 - [ ] The ask rows above come from `bash-downgrade`. With `git-write` off, every row asks.
 - [ ] Each of the eight `issues` tools is allowed with `issues` active. With it off, the six writes ask (source `default`, unmatched non-Bash). `github_label_list` and `github_subissue_list` are not in the baseline, so with `issues` off they also ask (source `default`), and with it on they are allowed. Rows cover both reads in both states. The list matches the real mcp-workspace tool names.
@@ -100,6 +104,7 @@ Parameterised profiles (`issues 123`, wider push forms). A typed commit and push
 - [ ] README replaces the "design stage, nothing is built yet" status line with the actual state (version 0, pre-release; the features of Drafts 01 to 08 implemented), and says the `issues` profile hardcodes the `mcp-workspace` server name (`mcp__mcp-workspace__*`), so users of another server define their own profile.
 - [ ] README and SECURITY.md state that `hooks/`, `types/` and `.claude-plugin/` in the working tree are deliberately unprotected (so the mod can be developed with itself active), although `npm run test` and `npm run check` execute them.
 - [ ] README and SECURITY.md state that `git push --force-with-lease` is allowed by `git-write`, is a force push that can overwrite remote history, and that every other force form does not match an allow rule, so it asks (a subagent's unmatched Bash call is denied; a headless run turns the ask into a deny, when detectable). Neither document claims that force pushes are blocked.
+- [ ] README states that a commit message containing `<` or `>` (for example the Co-Authored-By trailer), or passed by heredoc, does not match `git-write`'s allow rule and asks, and gives the workaround `git commit -F <path>` with the message written by the MCP file tool; the file may contain the trailer, since only the command line is matched (the table rows above cover it).
 - [ ] README documents the exact `git-write` push forms, and that `reference_name` and `state: closed` cannot be restricted in v1.
 - [ ] README examples are copied from `tests/fixtures` or the test rows above (or Draft 08's rows for `/gate-explain`; the example outputs for `/gate-on` and `/gate-why` come from the test rows of Draft 04 and Draft 07), except the `claude -p` and replay examples, which the README marks as manual examples (not covered by a test row).
 - [ ] CHANGELOG.md is updated.
