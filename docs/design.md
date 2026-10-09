@@ -49,7 +49,7 @@ Three layers:
 2. **Built-in profiles** (`git-write`, `issues`) ship with the mod and work with no config file.
 3. The **user file** adds profiles and may replace a built-in by reusing its name. The whole definition wins, with no merging.
 
-The user file is JSON at `$XDG_CONFIG_HOME/mode-gate/config.json`, falling back to `~/.config/mode-gate/config.json` on all platforms, Windows included. `MODE_GATE_CONFIG` overrides the path, mainly for tests and headless runs. The shape is `{ "profiles": { "<name>": { "description", "delegable", "allow", "ask", "deny" } } }`. A JSON Schema, `mode-gate.schema.json`, ships in the repo, and users reference it with `$schema`.
+The user file is JSON at `$XDG_CONFIG_HOME/mode-gate/config.json`, falling back to `~/.config/mode-gate/config.json` on all platforms, Windows included. `MODE_GATE_CONFIG` overrides the path, mainly for tests and headless runs. The shape is `{ "logDir": "logs", "profiles": { "<name>": { "description", "delegable", "allow", "ask", "deny" } } }`. `logDir` is optional (default `logs`). A JSON Schema, `mode-gate.schema.json`, ships in the repo, and users reference it with `$schema`.
 
 A project may contain `.mode-gate.json` at its root, in the same shape. Its profiles are proposals and are never active. `/gate-check` lists them. The user adopts one by copying it into their own config by hand. Across active profiles, deny beats ask beats allow, whatever the source, and nothing loosens the baseline's denies. An invalid config fails closed: only the baseline is active, and the errors are shown.
 
@@ -97,7 +97,7 @@ The path guards are extra sources fed into this order, not overrides: a protecte
 | ------------------------ | ---------------------------------------------------------------------------------------------- |
 | `/gate-on <profile>...`  | Switch profiles on. Prints a short summary of what they allow.                                 |
 | `/gate-off <profile>...` | Switch profiles off. `all` switches every profile off.                                         |
-| `/gate-status`           | Baseline, active profiles and the files they came from.                                        |
+| `/gate-status`           | Baseline summary, active profiles and the config path in use.                                  |
 | `/gate-why [n]`          | The last n verdicts with the rule and profile that fired.                                      |
 | `/gate-check`            | Validate the config: conflicts, unknown tools, over-broad rules. Also lists project proposals. |
 | `/gate-explain <tool> …` | Dry run one call and show the verdict and the rule chain.                                      |
@@ -110,7 +110,7 @@ Only the user switches profiles. The mod registers no tool that Claude could cal
 
 - A profile the user switches on lasts the session.
 - A profile that a skill declares lasts until the next prompt.
-- Profiles are cleared on `/clear` and never restored on resume.
+- Profiles are cleared on `/clear` (the config is reloaded) and never restored on resume: profiles switched on in an earlier session do not come back.
 - The band shows profile names, so a forgotten profile stays visible.
 
 ## Subagents
@@ -125,9 +125,9 @@ Later: skills and agents may declare profiles in their definitions, which would 
 
 ## Headless runs
 
-- Starting profiles come from the environment variable `MODE_GATE_PROFILES`, read once at session start, for example `MODE_GATE_PROFILES=issues,git-write`. A repo cannot set it.
+- Starting profiles come from the environment variable `MODE_GATE_PROFILES`, read once per process and applied in every new process, including `claude --resume`, for example `MODE_GATE_PROFILES=issues,git-write`. A repo cannot set it.
 - Profiles cannot change during a run.
-- A call that would ask is denied, with a message naming the profile that would be needed.
+- A call that would ask because of an active rule or a guard is denied (a passed-through Claude Code verdict stays `ask`), with a message naming the available profiles whose allow rules would match the call, or a generic message if none would. This needs the session to be detectably headless (assumption 12). If it is not detectable, the mod returns `ask` and Claude Code resolves it.
 
 ## Permission modes
 
@@ -141,13 +141,13 @@ Auto and bypass mode are out of scope for version 1. The README says the mod is 
 
 ## Decision log
 
-- The mod writes a log file in a configurable folder (default `logs`).
+- The mod writes a log file in the folder named by the config key `logDir` (default `logs`), resolved relative to the session's project directory; an absolute path is allowed.
 - Each entry has a timestamp, the verdict, the rule and profile that fired, the agent and the tool name. It records no arguments.
 - `/gate-why` reads the log. Replay uses session transcripts, not the log.
 
 ## Failure
 
-Every gating hook has a `.catch` handler that fails closed (ask or deny, never allow).
+Every gating hook has a `.catch` handler that fails closed (never allow): `tool.call` returns deny, because it cannot ask; `tool.check` returns ask.
 
 ## Code structure
 
@@ -208,23 +208,23 @@ The mod does not protect against anything a mod or program does outside Claude's
 
 Check each against the mods reference and its TypeScript declarations before building.
 
-| #   | Assumption                                                    | Why it matters                                                           |
-| --- | ------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1   | `tool.check` exposes the tool input, such as the Bash command | Rules cannot look at the command without it.                             |
-| 2   | `tool.call` and `tool.check` carry an agent id                | The subagent rules and per-agent profiles depend on it.                  |
-| 3   | A slash command's text reaches `prompt.submit`                | Needed to tell when a skill-declared profile ends.                       |
-| 4   | The test kit can raise `tool.check` directly                  | Otherwise the verdict hook is tested only through `decide`.              |
-| 5   | Each terminal session has its own copy of module state        | `$.state` is documented as per session. Do not rely on module variables. |
-| 6   | A mod can read the current permission mode                    | Needed to avoid loosening in auto and bypass mode.                       |
-| 7   | A mod can ask Claude Code how it would decide a call          | Needed for "never override a stricter verdict".                          |
-| 8   | Settings files can define environment variables               | Decides which files the protected paths must cover.                      |
-| 9   | Plugins are stored under `~/.claude/plugins/`                 | Decides the protected paths.                                             |
-| 10  | A mod sees a subagent launch and its parameters               | Needed to record the profiles the parent assigns.                        |
-| 11  | Hooks run for `bypassPermissions` agents                      | Otherwise those agents skip the mod entirely.                            |
-| 12  | Hooks run under `claude -p`                                   | Needed for headless runs.                                                |
-| 13  | A mod can draw below the entry box                            | Otherwise the band stays above the prompt.                               |
-| 14  | A command can offer argument completion                       | Decides how profile names are suggested.                                 |
-| 15  | A mod can tell when a skill starts and ends                   | Needed for skill-declared profiles.                                      |
+| #   | Assumption                                                                                                                                                                                                         | Why it matters                                                                                                                            |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `tool.check` exposes the tool input, such as the Bash command                                                                                                                                                      | Rules cannot look at the command without it.                                                                                              |
+| 2   | `tool.call` and `tool.check` carry an agent id; main-session and subagent calls are distinguishable; `tool.check` still fires for a call `tool.call` denied                                                        | The subagent rules and per-agent profiles depend on it.                                                                                   |
+| 3   | A slash command's text reaches `prompt.submit`                                                                                                                                                                     | Needed to tell when a skill-declared profile ends.                                                                                        |
+| 4   | The test kit can raise `tool.check` directly                                                                                                                                                                       | Otherwise the verdict hook is tested only through `decide`.                                                                               |
+| 5   | Each terminal session has its own copy of module state; `$.state` after `/clear` and on resume, whether a signal for them exists, and whether the `session.start` event says why it fired (startup, resume, clear) | `$.state` is documented as per session. Do not rely on module variables. Profiles must reset on `/clear` and never be restored on resume. |
+| 6   | A mod can read the current permission mode                                                                                                                                                                         | Needed to avoid loosening in auto and bypass mode.                                                                                        |
+| 7   | A mod can ask Claude Code how it would decide a call                                                                                                                                                               | Needed for "never override a stricter verdict".                                                                                           |
+| 8   | Settings files can define environment variables                                                                                                                                                                    | Decides which files the protected paths must cover.                                                                                       |
+| 9   | Plugins are stored under `~/.claude/plugins/`                                                                                                                                                                      | Decides the protected paths.                                                                                                              |
+| 10  | A mod sees a subagent launch and its parameters                                                                                                                                                                    | Needed to record the profiles the parent assigns.                                                                                         |
+| 11  | Hooks run for `bypassPermissions` agents                                                                                                                                                                           | Otherwise those agents skip the mod entirely.                                                                                             |
+| 12  | Hooks run under `claude -p`, and a hook can tell that the session is headless (a flag on the event, an environment variable, or similar)                                                                           | Needed for headless runs and for turning asks into denies there.                                                                          |
+| 13  | A mod can draw below the entry box                                                                                                                                                                                 | Otherwise the band stays above the prompt.                                                                                                |
+| 14  | A command can offer argument completion                                                                                                                                                                            | Decides how profile names are suggested.                                                                                                  |
+| 15  | A mod can tell when a skill starts and ends                                                                                                                                                                        | Needed for skill-declared profiles.                                                                                                       |
 
 ## Later
 

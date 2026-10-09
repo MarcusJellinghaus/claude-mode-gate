@@ -10,12 +10,12 @@ This is Draft 03 of 11 (plan: Draft 00). `decide()` is the security boundary. Dr
 
 **Decision order.** The first match wins:
 
-1. A subagent calls Bash and no active allow rule matches the call (an ask or deny rule does not count as holding it): deny. `decide` reports `source` = the subagent-Bash rule and builds no text; `register.ts` (Draft 04) adds the redirect text from Draft 05's `redirectHint`.
+1. A subagent calls Bash and no active allow rule matches the call (an ask or deny rule does not count as holding it): deny. `decide` works from the agent context in its input (Draft 04 sets it: a call is a subagent call only when the event carries an agent id that identifies a subagent; every other call is a main-session call). It reports `source` = `subagent-bash` and builds no text; `register.ts` (Draft 04) adds the redirect text from `redirectHint`, a stub until Draft 05 supplies the real one. The rule works from Draft 04 on, with no need for Draft 06.
 2. Edit or Write targets a protected path: deny (Draft 05 supplies the list).
 3. Across the active set (baseline plus switched-on profiles), deny beats ask beats allow.
 4. A call that matches nothing keeps Claude Code's own verdict.
 
-A deny from Claude Code is never overridden. An allow from Claude Code is downgraded to ask for Bash unless an active rule allows the call. An active allow rule overrides Claude Code's own ask (that is what the Bash downgrade means), but never Claude Code's own deny. When Claude Code's own verdict is unavailable (assumption 7), `decide` treats it as `ask`.
+A deny from Claude Code is never overridden. An allow from Claude Code is downgraded to ask for Bash unless an active rule allows the call. An active allow rule overrides Claude Code's own ask (that is what the Bash downgrade means), but never Claude Code's own deny. When Claude Code's own verdict is unavailable (assumption 7), `decide` treats it as `ask`: an unmatched Bash call asks with `source` = `bash-downgrade` (Bash is the weak spot, and this ask is the mod's own), and an unmatched non-Bash call asks with `source` = `default`.
 
 **Guards compose with the rules; they never override them.** The guards are pure functions in `hooks/guards.ts` (Draft 05 owns them). `register.ts` calls them with the tool call and passes their results to `decide`. Each result is `{ kind: 'deny' | 'ask', message: string }`, or nothing. `decide` computes no paths. A `deny` result (protected path) is a step-2 deny. An `ask` result (the ask-path guard: `package.json`, `scripts/`, tool configs) is an ask source at step 3, so a profile `deny *` still wins over it (deny beats ask beats allow). A guard never turns a deny into an ask or an allow. `decide` passes the guard's `message` through to its decision.
 
@@ -40,7 +40,7 @@ Nothing is trimmed or normalised: odd spacing that misses an allow rule falls th
 
 ## Goal
 
-Implement `decide()` in `hooks/policy.ts` with the decision order above, pure and fully tested. The input is the call (tool name, tool input), the active set (the baseline in the shape above plus the switched-on profiles), the list of guard results (`{ kind: 'deny' | 'ask', message }` from Draft 05's `hooks/guards.ts`), the agent context and Claude Code's own verdict. The output is a decision `{ verdict, source, rule?, profile?, message? }`. `source` says what fired: a profile or baseline rule, a guard, the subagent-Bash rule, or Claude Code's own verdict passed through. `rule` is the matched rule's `raw`; `profile` is its profile name (`baseline` for baseline rules). `message` is the firing guard's message, passed through unchanged. Draft 04 builds the hook result `{ verdict, message? }` from it. When `source` is the subagent-Bash rule, `register.ts` calls `redirectHint(command)` (Draft 05, `hooks/guards.ts`) and puts its text in `message`; `decide` builds no redirect text. The profile hint for denials is added the same way. Drafts 07 and 08 use `source`. Field names other than `verdict`, `source`, `rule`, `profile` and `message` are the implementer's choice.
+Implement `decide()` in `hooks/policy.ts` with the decision order above, pure and fully tested. The input is the `call` (`{ toolName, input, agentId?, toolCallId? }`: the tool name, the tool input such as the Bash command or file path, and the agent id and tool-call id when the event carries them; Draft 04 builds it), the active set (the baseline in the shape above plus the switched-on profiles), the list of guard results (`{ kind: 'deny' | 'ask', message }` from Draft 05's `hooks/guards.ts`), the agent context and Claude Code's own verdict. The output is a decision `{ verdict, source, rule?, profile?, message? }`. `source` says what fired and is one of a closed list: `rule` (a profile or baseline rule), `guard` (a guard result), `subagent-bash` (decision-order step 1), `bash-downgrade` (the ask from the rule "a Bash call Claude Code would allow is downgraded to ask unless an active allow rule matches", also the ask for an unmatched Bash call when Claude Code's verdict is unavailable), `malformed` (malformed input), `claude-code` (Claude Code's own verdict passed through) and `default` (the ask for an unmatched non-Bash call when Claude Code's verdict is unavailable). `rule` is the matched rule's `raw`; `profile` is its profile name (`baseline` for baseline rules). `message` is the firing guard's message, passed through unchanged. Draft 04 builds the hook result `{ verdict, message? }` from it. When `source` is `subagent-bash`, `register.ts` calls `redirectHint(command)` (Draft 05, `hooks/guards.ts`) and puts its text in `message`; `decide` builds no redirect text. The profile hint for denials (which profile would be needed) is added by Draft 06, also in `register.ts`, from the full decision; `decide` builds no hint text. Drafts 07 and 08 use `source`. Field names other than `verdict`, `source`, `rule`, `profile` and `message` are the implementer's choice.
 
 ## Scope
 
@@ -49,7 +49,7 @@ Implement `decide()` in `hooks/policy.ts` with the decision order above, pure an
 - Define the input and the decision types (see Goal). Report the rule that fired by its `raw`, its profile name and the `source`, because Draft 07 logs them and Draft 08 explains them.
 - Whole-tool matching (`*`, bare `mcp__<server>`, `mcp__<server>__<tool>`, plain names) and Bash exact and prefix matching in two modes: strict for allow rules, boundary-checked substring for deny and ask rules.
 - Deny beats ask beats allow; Claude Code's deny never overridden; unmatched keeps Claude Code's verdict.
-- Subagent Bash rule (step 1) and the guard results (a `deny` result at step 2, an `ask` result at step 3) as parameters, so Draft 05 and Draft 06 only supply data. `decide` does not compute paths.
+- Subagent Bash rule (step 1, from the agent context in the input) and the guard results (a `deny` result at step 2, an `ask` result at step 3) as parameters, so Draft 05 and Draft 06 only supply data. `decide` does not compute paths.
 
 ## Out of scope / later
 
@@ -66,21 +66,22 @@ Matching by argument. Enforce mode. The guards themselves, the protected-path li
 - [ ] Deny and ask side, exact rule: `deny Bash(rm -rf /)` denies `a; rm -rf /` and `a && rm -rf / b`; it does not fire on `a; rm -rf /tmp` or `a; xrm -rf /`. `ask Bash(rm -rf /)` asks for `a; rm -rf /`.
 - [ ] Every occurrence is tested: `deny Bash(git push *)` denies `xgit push; git push` (the first occurrence fails the preceding boundary, the second passes).
 - [ ] Colon-ending prefix: `deny Bash(npm run check:*)` fires on `x; npm run check:docs` (the follow-boundary test is skipped for this prefix rule). An exact rule never skips it.
-- [ ] Claude Code's own verdict unavailable (assumption 7): an unmatched call gets `ask`, and so does a Bash call no active rule allows; a matching deny rule still denies.
-- [ ] The subagent-Bash deny reports `source` subagent-Bash and no redirect text; `register.ts` (Draft 04) adds the text from `redirectHint`.
+- [ ] Claude Code's own verdict unavailable (assumption 7): an unmatched Bash call gets `ask` with `source` `bash-downgrade`; an unmatched non-Bash call gets `ask` with `source` `default`; a matching deny rule still denies.
+- [ ] The subagent-Bash deny (agent context says subagent) reports `source` `subagent-bash` and no redirect text; `register.ts` (Draft 04) adds the text from `redirectHint`. The same Bash call with a main-session context is not denied by this step.
+- [ ] `source` is always one of `rule`, `guard`, `subagent-bash`, `bash-downgrade`, `malformed`, `claude-code`, `default` (table test over all rows). The ask for a Bash call Claude Code would allow reports `bash-downgrade`; malformed input reports `malformed`; the unavailable-verdict ask reports `bash-downgrade` for Bash and `default` for other tools.
 - [ ] Empty prefix: `deny Bash(*)` and `ask Bash(*)` match `x; git push` and `git status`.
 - [ ] A rule allow overrides Claude Code's ask but not its deny: an active allow with a Claude Code ask gives allow; with a Claude Code deny it stays deny.
 - [ ] Allow rules never use substring mode: `allow Bash(git status *)` and `allow Bash(npm run check)` do not match `x; git status` or `x; npm run check`.
 - [ ] Step 1 holds only for allow rules: a subagent whose only matching Bash rule is an ask or deny still gets the redirect deny.
 - [ ] Guards compose (rows pass guard results in, no paths): a `deny` guard result wins over a profile allow; an `ask` guard result asks despite a profile allow, but a profile `deny *` or `deny mcp__srv` wins over it; no row turns a deny into an ask or allow.
-- [ ] A guard result's `message` appears unchanged in the decision, and the decision reports `source` guard.
+- [ ] A guard result's `message` appears unchanged in the decision, and the decision reports `source` `guard`.
 - [ ] Whole-tool rows: an allow `mcp__srv` matches `mcp__srv__a` and `mcp__srv__b` but not `mcp__srv2__a`, `mcp__other__a` or `Bash`; `mcp__srv__a` matches only that tool (not `mcp__srv__ab`); a plain name (`Skill`) matches only that tool; `*` matches every tool, including `Bash` and an `mcp__` tool.
 - [ ] `*` in a deny list denies every call, including a baseline-allowed read tool. `*` in an ask list asks for every call. `mcp__srv` in deny denies all tools of that server and no others.
 - [ ] A Claude Code deny stays a deny in every row.
 - [ ] A Claude Code allow for Bash becomes ask unless an active rule allows it.
-- [ ] A decision from a rule reports `source`, that rule's `raw` and its profile name (baseline rules report `baseline`). A guard, the subagent-Bash rule and a passed-through Claude Code verdict each report their own `source`.
+- [ ] A decision from a rule reports `source`, that rule's `raw` and its profile name (baseline rules report `baseline`). A guard, the subagent-Bash rule and a passed-through Claude Code verdict each report their own `source` (`guard`, `subagent-bash`, `claude-code`).
 - [ ] Malformed input: a Bash call with a missing or non-string `command` (even under an active `allow Bash` or `allow *`), and a call with no tool name, each return `ask`. The same Bash call from a subagent returns `deny` (step 1).
-- [ ] Unknown non-Bash tool, no active rule matches: Claude Code's own verdict is passed through, allow included, with `source` = Claude Code's verdict.
+- [ ] Unknown non-Bash tool, no active rule matches: Claude Code's own verdict is passed through, allow included, with `source` `claude-code`.
 - [ ] `decide` never returns allow on its own for unknown or malformed input. Allow comes only from an active allow rule or from Claude Code's own allow passed through for an unmatched non-Bash call (step 4).
 - [ ] `npm run test:coverage` reaches 95% on `hooks/policy.ts`.
 - [ ] `npm run test:mutation` stays above the `break` threshold of 75 (aim for the `high` of 90).
@@ -100,7 +101,7 @@ TDD, KISS, clean code, concise writing. Use the mcp-workspace MCP tools for file
 
 ## Depends on
 
-Draft 01 (input shapes: assumptions 1 and 7). It can run in parallel with Draft 02. `Profile` and `Rule` are defined in `hooks/policy.ts` by whichever of the two starts first; the other builds on them (say so in the PR).
+Draft 01 (input shapes: assumptions 1, 2 and 7). It can run in parallel with Draft 02. `Profile` and `Rule` are defined in `hooks/policy.ts` by whichever of the two starts first; the other builds on them (say so in the PR).
 
 ## References
 

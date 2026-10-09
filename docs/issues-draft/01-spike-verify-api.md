@@ -17,23 +17,23 @@ Constraints the findings must respect:
 
 `docs/design.md` ("Unverified assumptions") is the source of truth for this table. The copy here keeps the issue self-contained.
 
-| #   | Assumption                                                    | Why it matters                                              |
-| --- | ------------------------------------------------------------- | ----------------------------------------------------------- |
-| 1   | `tool.check` exposes the tool input, such as the Bash command | Rules cannot look at the command without it                 |
-| 2   | `tool.call` and `tool.check` carry an agent id                | Subagent rules and per-agent profiles depend on it          |
-| 3   | A slash command's text reaches `prompt.submit`                | Tells when a skill-declared profile ends                    |
-| 4   | The test kit can raise `tool.check` directly                  | Otherwise the verdict hook is tested only through `decide`  |
-| 5   | Each terminal session has its own copy of module state        | `$.state` is per session; module variables must not be used |
-| 6   | A mod can read the current permission mode                    | Avoids loosening in auto and bypass mode                    |
-| 7   | A mod can ask Claude Code how it would decide a call          | Needed for "never override a stricter verdict"              |
-| 8   | Settings files can define environment variables               | Decides which files protected paths must cover              |
-| 9   | Plugins are stored under `~/.claude/plugins/`                 | Decides the protected paths                                 |
-| 10  | A mod sees a subagent launch and its parameters               | Needed to record the profiles the parent assigns            |
-| 11  | Hooks run for `bypassPermissions` agents                      | Otherwise those agents skip the mod entirely                |
-| 12  | Hooks run under `claude -p`                                   | Needed for headless runs                                    |
-| 13  | A mod can draw below the entry box                            | Otherwise the band stays above the prompt                   |
-| 14  | A command can offer argument completion                       | Decides how profile names are suggested                     |
-| 15  | A mod can tell when a skill starts and ends                   | Needed for skill-declared profiles (later)                  |
+| #   | Assumption                                                                                                                                                                                                         | Why it matters                                                                                                          |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| 1   | `tool.check` exposes the tool input, such as the Bash command                                                                                                                                                      | Rules cannot look at the command without it                                                                             |
+| 2   | `tool.call` and `tool.check` carry an agent id; main-session and subagent calls are distinguishable; `tool.check` still fires for a call `tool.call` denied                                                        | Subagent rules and per-agent profiles depend on it                                                                      |
+| 3   | A slash command's text reaches `prompt.submit`                                                                                                                                                                     | Tells when a skill-declared profile ends                                                                                |
+| 4   | The test kit can raise `tool.check` directly                                                                                                                                                                       | Otherwise the verdict hook is tested only through `decide`                                                              |
+| 5   | Each terminal session has its own copy of module state; `$.state` after `/clear` and on resume, whether a signal for them exists, and whether the `session.start` event says why it fired (startup, resume, clear) | `$.state` is per session; module variables must not be used. Profiles must reset on `/clear`, not be restored on resume |
+| 6   | A mod can read the current permission mode                                                                                                                                                                         | Avoids loosening in auto and bypass mode                                                                                |
+| 7   | A mod can ask Claude Code how it would decide a call                                                                                                                                                               | Needed for "never override a stricter verdict"                                                                          |
+| 8   | Settings files can define environment variables                                                                                                                                                                    | Decides which files protected paths must cover                                                                          |
+| 9   | Plugins are stored under `~/.claude/plugins/`                                                                                                                                                                      | Decides the protected paths                                                                                             |
+| 10  | A mod sees a subagent launch and its parameters                                                                                                                                                                    | Needed to record the profiles the parent assigns                                                                        |
+| 11  | Hooks run for `bypassPermissions` agents                                                                                                                                                                           | Otherwise those agents skip the mod entirely                                                                            |
+| 12  | Hooks run under `claude -p`, and a hook can tell that the session is headless (a flag on the event, an environment variable, or similar)                                                                           | Needed for headless runs and for turning asks into denies there                                                         |
+| 13  | A mod can draw below the entry box                                                                                                                                                                                 | Otherwise the band stays above the prompt                                                                               |
+| 14  | A command can offer argument completion                                                                                                                                                                            | Decides how profile names are suggested                                                                                 |
+| 15  | A mod can tell when a skill starts and ends                                                                                                                                                                        | Needed for skill-declared profiles (later)                                                                              |
 
 `docs/design.md` is the source of truth for this table. If it changes, re-sync this table.
 
@@ -41,7 +41,7 @@ Assumption 4 means the plugin test facility: the way to run a mod's hooks in a t
 
 **Bash-only session:** a session whose only way to run Claude Code is `claude -p` from Bash. It has no interactive terminal (TTY).
 
-Each row gets exactly one verification method:
+Each row gets exactly one verification method (row 12 covers both parts: hooks run under `claude -p`, and headless is detectable):
 
 | Method                                             | Rows                    |
 | -------------------------------------------------- | ----------------------- |
@@ -80,9 +80,9 @@ Replace guesses with facts. Verify each of the 15 assumptions against a real Cla
 
 - Find the Claude Code documentation for mods and the procedures to load, run and launch (step 2 of "How to start").
 - Load a small probe mod (the prototype) by those procedures and observe the real shapes of events, payloads and declarations.
-- Verify each row by its method in the table above. Probe rows (`claude -p`): tool input in `tool.check` (1); agent id on `tool.call` and `tool.check` (2); permission mode readable (6); subagent launch visibility (10); hooks under `bypassPermissions` agents (11) and under `claude -p` (12); skill start and end (15).
+- Verify each row by its method in the table above. Probe rows (`claude -p`): tool input in `tool.check` (1); agent id on `tool.call` and `tool.check`, whether main-session and subagent calls are distinguishable (for example only subagent calls carry an id, or the id differs from a known main-session id), and whether `tool.check` still fires for a call that `tool.call` denied (2; run a main-session call and a subagent call, and a call that a `tool.call` deny should block); permission mode readable (6); subagent launch visibility (10); hooks under `bypassPermissions` agents (11); hooks under `claude -p` and whether a hook can detect that the session is headless (a flag on the event, an environment variable, or similar) (12); skill start and end (15).
 - Rows that need an interactive terminal cannot be observed in a Bash-only session: slash commands run live, the band (13), argument completion (14), hot-reload and two concurrent sessions. Rows 13 and 14 are read from the docs and declarations. They end `documented` or `verified` if those state the fact, and `unknown` only if nothing does. The Evidence cell gives the source or the reason, and the row states its fallback or why none is needed. Do not block on them; the owner may check them interactively later. The design already has fallbacks: the band stays above the prompt (13), and an unknown profile name returns an error that lists the valid names (14).
-- Row 5 (state per session) is verified from the docs and any declaration. It becomes `unknown` only if neither states it.
+- Row 5 (state per session, what happens to `$.state` on `/clear` and on resume, whether a signal for them exists, and whether `session.start` says why it fired) is verified from the docs and any declaration. It becomes `unknown` only if neither states it. Draft 04 depends on this finding.
 - Row 3 settles whether `prompt.submit` stays in the gating event list. Its methods are the declarations plus a `claude -p "/<command>"` probe.
 - Rows 4, 7, 8 and 9 use their single method (docs for 4, 8 and 9; declarations for 7); none is probed.
 - Read the built-in sec-default source if it is readable and note its fail-closed patterns. Its location is unknown. If the source is not readable, record that and rely on the docs.
@@ -105,9 +105,9 @@ Assumptions 1, 6 and 7 are central to the design. Row 7 uses the status mapping 
 
 Known impacts to start from:
 
-- Assumption 2: subagent profiles (Draft 06) cannot be enforced per agent. Say what is dropped.
+- Assumption 2, no agent id, or main-session and subagent calls not distinguishable: subagent profiles (Draft 06) cannot be enforced per agent, and every call counts as main-session, so the subagent-Bash deny (Draft 03 and 04) is inert. Say what is dropped. If `tool.check` still fires for a call that `tool.call` denied, Draft 04 and 07 log that call once, by tool-call id.
 - Assumption 11: `bypassPermissions` agents skip the mod, so Draft 10 must stop using them.
-- Assumption 12: headless runs are unsupported.
+- Assumption 12: if hooks do not run under `claude -p`, headless runs are unsupported. If they run but headless cannot be detected, the ask-to-deny conversion is inert (Draft 04) and Claude Code resolves asks itself.
 
 If `CLAUDE_CONFIG_DIR` is not supported (step 4), stop and ask. Do not probe against the live config.
 

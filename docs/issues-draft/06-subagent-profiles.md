@@ -13,7 +13,7 @@ This is Draft 06 of 11 (plan: Draft 00). It makes delegation safe: a subagent ge
 - The prompt tells the subagent to use only those profiles. The mod enforces the same list, by agent id.
 - A denied call returns a message naming the profile that would be needed. The subagent stops and reports. The parent decides; profiles marked non-delegable go to the user. There is no request tool.
 - Revoking a profile also removes the copies delegated from it.
-- Decision order step 1: a subagent calls Bash and holds no profile with a Bash rule for it: deny, with the redirect message (Draft 05). Then protected paths, then deny beats ask beats allow across the subagent's active set.
+- Decision order step 1: a subagent calls Bash and no active allow rule matches this call: deny, with the redirect message (Draft 05). Then protected paths, then deny beats ask beats allow across the subagent's active set.
 - Security model row: "A subagent asks for more" is a confused-deputy risk, closed by "the parent decides, and non-delegable profiles go to the user".
 - Later (not here): skills and agents declaring profiles in their definitions.
 
@@ -27,7 +27,7 @@ This is Draft 06 of 11 (plan: Draft 00). It makes delegation safe: a subagent ge
 
 ## Existing code
 
-- `hooks/policy.ts`: pure; `decide` from Draft 03 takes the agent context. `hooks/register.ts`: wiring; Draft 04's state in `$.state` gains a per-agent profile map.
+- `hooks/policy.ts`: pure; `decide` from Draft 03 takes the agent context. `hooks/register.ts`: wiring; Draft 04's state in `$.state` (the active profile names, an array in switch-on order) gains a per-agent profile map.
 - `.claude/agents/commit-pusher.md`, `issue-approver.md`, `issue-updater.md`: copied from mcp-coder, run with `bypassPermissions` (Draft 10 reviews them).
 - `CLAUDE.md` "Testing strategy": test through `decide`, negative test per security rule.
 
@@ -59,7 +59,7 @@ A request tool for subagents. Skill and agent declared profiles.
 - [ ] The denial names the profile and says to stop and report.
 - [ ] `/gate-off` of a profile removes it from subagents that got it from that profile.
 - [ ] A nested agent never holds more than its parent.
-- [ ] A subagent holding no Bash rule is denied Bash with the redirect.
+- [ ] A subagent Bash call that no active allow rule matches is denied with the redirect.
 - [ ] `npm run check` passes.
 
 ## How to start

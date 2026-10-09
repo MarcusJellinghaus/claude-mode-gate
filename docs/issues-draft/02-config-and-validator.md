@@ -35,6 +35,7 @@ This is Draft 02 of 11 (plan: Draft 00). It defines and validates the data that 
 | A bare `mcp__<server>` in an allow list                                                                                       | warning  |
 | An unknown non-MCP tool name                                                                                                  | warning  |
 | A bad or reserved profile name, a wrong type, a missing or empty `description`, an unknown key, an unparsable rule            | error    |
+| `logDir` that is not a non-empty string                                                                                       | error    |
 | An unsupported rule form: an argument on a non-Bash tool, or a `*` that is not the last character of a Bash argument          | error    |
 
 The warnings are warnings because precedence already resolves them. The baseline-deny case is an error so that no profile can even try to re-allow what the baseline denies. Every issue found in a project `.mode-gate.json` is downgraded to a warning (see Project profiles).
@@ -45,7 +46,8 @@ The warnings are warnings because precedence already resolves them. The baseline
 
 - JSON, with a shipped JSON Schema `mode-gate.schema.json` in the repo root, for editor validation. Users reference it with a `$schema` key.
 - User config path: `MODE_GATE_CONFIG` if set (for tests and headless runs); else `$XDG_CONFIG_HOME/mode-gate/config.json`; else `<home>/.config/mode-gate/config.json` on all platforms, Windows included. `<home>` comes from the injected environment: `HOME`, else `USERPROFILE`. If none is set, that is an error (fail closed).
-- Shape: `{ "profiles": { "<name>": { "description": "...", "delegable": true, "allow": [], "ask": [], "deny": [] } } }`.
+- Shape: `{ "logDir": "logs", "profiles": { "<name>": { "description": "...", "delegable": true, "allow": [], "ask": [], "deny": [] } } }`.
+- `logDir` is optional and defaults to `logs`. It is the folder of the decision log (Draft 07), resolved relative to the session's project directory (`cwd`); an absolute path is allowed. It must be a non-empty string.
 - `description` is required and must be a non-empty string. `delegable` is a boolean per profile, default `true`. A parent cannot hand a non-delegable profile to a subagent; the request goes to the user.
 - The config file is a protected path: Edit and Write are denied on it (Draft 05).
 
@@ -57,7 +59,7 @@ The warnings are warnings because precedence already resolves them. The baseline
 - `validateConfig(input, deps)` returns `Issue[]`. `input` is the parsed JSON of a config file. It validates the user profiles and the built-ins.
 - `parseStartProfiles(env)` reads `MODE_GATE_PROFILES` (comma-separated, trimmed). It drops empty entries and warns about entries that are not valid profile names.
 - `loadConfig(deps)` reads the files, runs the validator, merges the layers and applies `parseStartProfiles`. `deps` is `{ readFile, env, cwd, baseline, builtins }`: a file reader, the environment, the project directory and the two data sets. Tests inject all of them. In production `hooks/config.ts` supplies the real baseline and built-ins as defaults.
-- Its result is `{ ok: true, config: { baseline, profiles, proposals }, startProfiles, warnings }` or `{ ok: false, errors, baseline, warnings }`. `baseline` is `{ name: 'baseline', allow: Rule[], ask: Rule[], deny: Rule[] }`, parsed by `parseRule` from the strings in `hooks/baseline.ts`, in both results. Draft 03 builds its active set (baseline plus switched-on profiles) from it. The failed result carries `baseline` so callers such as Draft 04 can fail closed (only the baseline active) without re-parsing it. `startProfiles` are the names from `MODE_GATE_PROFILES` that match a defined profile; each unknown name adds a warning. `ok` is `false` when any issue has severity error. Warnings alone still give `ok: true`.
+- Its result is `{ ok: true, config: { baseline, profiles, proposals }, configPath, logDir, startProfiles, warnings }` or `{ ok: false, errors, baseline, configPath, logDir, startProfiles, warnings }`. `logDir` is the resolved log folder (see Format and location) in both results; it is `logs` resolved against `cwd` when the config is missing or invalid. `configPath` is the resolved user config path (see Format and location) in both results, so `/gate-status` (Draft 04) can show it; if the path cannot be resolved (no home), it is `undefined`. `baseline` is `{ name: 'baseline', allow: Rule[], ask: Rule[], deny: Rule[] }`, parsed by `parseRule` from the strings in `hooks/baseline.ts`, in both results. Draft 03 builds its active set (baseline plus switched-on profiles) from it. The failed result carries `baseline` so callers such as Draft 04 can fail closed (only the baseline active) without re-parsing it. `startProfiles` (present in both results) are the validated names from `parseStartProfiles(env)` that match a defined profile; each unknown name adds a warning, which Draft 04's `/gate-status` shows. Draft 04 activates them at `session.start`. `ok` is `false` when any issue has severity error. Warnings alone still give `ok: true`.
 
 **Where the data lives.** Both data files hold raw rule **strings**, which `hooks/config.ts` parses with the same `parseRule` as the user file. There are no hand-written parsed literals.
 
@@ -85,6 +87,7 @@ For a name, the user file wins over the built-in, and the whole definition wins,
 - An unreadable or malformed file (bad JSON, permission error) is an error and fails closed.
 - On an invalid config only the baseline is active (the failed result's `baseline`), and the errors are shown. Built-in profiles stay switched off until the user switches them on.
 - If the baseline strings in `hooks/baseline.ts` themselves fail to parse, `baseline` is empty, so Claude Code's own verdicts apply and calls ask. The parse error is included in `errors`.
+- Draft 04 calls `loadConfig` once at `session.start`; `/gate-check` calls it again to validate without applying.
 - The project root for `.mode-gate.json` is the injected `cwd` (the session's project directory).
 
 **Project profiles are proposals only.** A project may contain `.mode-gate.json` at its root, with the same shape as the user file. Its profiles are never active and never take part in precedence. `/gate-check` lists them with their rules and a note that they are proposals. The user adopts one by copying it into their own config by hand. There is no adopt command in v1. An unknown name given to `/gate-on` that matches a project proposal gets a message saying so (Draft 04 shows it; this draft supplies the lookup). Every issue in an invalid project file is only a warning and does not invalidate the user config.
@@ -94,7 +97,7 @@ For a name, the user file wins over the built-in, and the whole definition wins,
 **Other relied-on rules.**
 
 - Version 1 matches non-Bash tools by whole-tool rules only (a plain name, `mcp__server__tool`, `mcp__server`, `*`) and Bash by exact and prefix rules. A Bash rule matches only if the command contains none of `& ; | $ ( ) \` < >` and no newline. Matching by argument is later.
-- `MODE_GATE_PROFILES` (for example `issues,git-write`) is read once at session start. A repo cannot set it. An unknown name in it is ignored with a warning and activates nothing for that name.
+- `MODE_GATE_PROFILES` (for example `issues,git-write`) is read once per process and applies on every new process, including `claude --resume`. A repo cannot set it. An unknown name in it is ignored with a warning and activates nothing for that name.
 - A profile with only `deny` entries is a restriction, for example a read-only profile.
 
 ## Existing code
@@ -130,14 +133,15 @@ The `/gate-check` command registration (Draft 04). The built-in profile contents
 - [ ] Table tests exist before the code, one row per valid and invalid config.
 - [ ] A malformed config is rejected with a message naming the field.
 - [ ] An unknown key is an error, except a top-level `$schema`.
-- [ ] The parser exports its accepted key set, and a test asserts that the property names in `mode-gate.schema.json` equal it.
+- [ ] The parser exports its accepted key set (`$schema`, `logDir`, `profiles`), and a test asserts that the property names in `mode-gate.schema.json` equal it.
 - [ ] `parseRule` gives `Bash(git commit *)` the prefix `git commit ` and `Bash(npm run check:*)` the prefix `npm run check:`; `*` parses to `{ tool: '*', kind: 'whole' }` and `Bash(*)` to `{ tool: 'Bash', kind: 'prefix', arg: '' }`; an unparsable rule gives a rule error. Every parsed rule has `raw` equal to its input string.
 - [ ] Unsupported forms are rule errors (table test, error message points to Draft 05): `Edit(src/**)`, `Read(./.env)`, `Write(*)` and `mcp__s__t(x)` (argument on a non-Bash tool); `Bash(git * push)`, `Bash(* push)` and `Bash(git **)` (`*` not the last character). Valid rows still parse: `Edit`, `*`, `mcp__s`, `mcp__s__t`, `Bash(git push *)`, `Bash(npm run check:*)`, `Bash(*)`.
 - [ ] The same forms in a config file give errors from `validateConfig` naming the field, for example `profiles.p.deny[0]`.
 - [ ] A prefix rule covers a rule of the same tool whose text starts with its prefix, and nothing else (table test, including a different tool and a shorter text).
-- [ ] `loadConfig` returns `{ ok: true, config: { baseline, profiles, proposals }, startProfiles, warnings }` for a valid config, where `baseline` is `{ name: 'baseline', allow, ask, deny }` with the rules of `hooks/baseline.ts` parsed (each with `raw`). It returns `{ ok: false, errors, baseline, warnings }` when any issue is an error, with `baseline` parsed as in the success result. Warnings alone give `ok: true`. With an invalid config only that baseline is active.
-- [ ] Test for the failure result: an invalid config gives `ok: false` with `errors`, `warnings` and the parsed `baseline` (each rule with `raw`).
+- [ ] `loadConfig` returns `{ ok: true, config: { baseline, profiles, proposals }, configPath, startProfiles, warnings }` for a valid config, where `baseline` is `{ name: 'baseline', allow, ask, deny }` with the rules of `hooks/baseline.ts` parsed (each with `raw`) and `configPath` is the resolved user config path. It returns `{ ok: false, errors, baseline, configPath, startProfiles, warnings }` when any issue is an error, with `baseline` and `configPath` as in the success result and `startProfiles` as in the success result (names matching defined profiles; none if profiles cannot be determined). Warnings alone give `ok: true`. With an invalid config only that baseline is active.
+- [ ] Test for the failure result: an invalid config gives `ok: false` with `errors`, `warnings`, `configPath` and the parsed `baseline` (each rule with `raw`).
 - [ ] Test for an unparsable baseline: with an injected baseline containing an unparsable rule string, `loadConfig` returns `ok: false`, an empty `baseline` (all three lists empty) and the parse error in `errors`.
+- [ ] `logDir` is optional. It must be a non-empty string (an empty string or a non-string is an error naming `logDir`). `loadConfig` returns the resolved `logDir` in both the success and the failure result: `logs` against `cwd` by default, also when the config is missing or invalid; a relative value resolves against `cwd`, an absolute value is kept.
 - [ ] A missing user file is not an error. An unreadable or malformed file is an error.
 - [ ] An invalid project `.mode-gate.json` yields warnings only (every issue downgraded); the user config stays valid.
 - [ ] A user profile with a built-in's name replaces it whole, with no merging.
@@ -148,7 +152,7 @@ The `/gate-check` command registration (Draft 04). The built-in profile contents
 - [ ] An unknown non-MCP tool name is a warning. `mcp__<server>__<tool>` and `mcp__<server>` are never errors for an unknown server. The built-in names sit in one constant.
 - [ ] `/gate-check` support: the validator covers the user file and the built-ins, and the loader returns the project proposals for listing.
 - [ ] `parseStartProfiles` splits and trims `MODE_GATE_PROFILES` and warns about invalid names. An unknown name is reported by `loadConfig` and activates nothing.
-- [ ] The config path is `MODE_GATE_CONFIG` if set, else `$XDG_CONFIG_HOME/mode-gate/config.json`, else `<home>/.config/mode-gate/config.json` with `<home>` from `HOME`, else `USERPROFILE` of the injected environment. With none set, `loadConfig` fails closed.
+- [ ] The config path is `MODE_GATE_CONFIG` if set, else `$XDG_CONFIG_HOME/mode-gate/config.json`, else `<home>/.config/mode-gate/config.json` with `<home>` from `HOME`, else `USERPROFILE` of the injected environment. With none set, `loadConfig` fails closed (`ok: false`, `configPath` undefined). The resolved path is returned as `configPath`.
 - [ ] `hooks/baseline.ts` holds exactly the rules listed in Decisions, as strings, and the built-ins are empty placeholders. A test asserts that every baseline and built-in rule string parses without error.
 - [ ] `hooks/baseline.ts` and `hooks/builtin-profiles.ts` import nothing at runtime, enforced by the new dependency-cruiser rule with `tsPreCompilationDeps: true` (`npm run arch` passes).
 - [ ] `hooks/config.ts` imports the baseline and the built-ins as defaults of `deps`, so `npm run deadcode` passes.
