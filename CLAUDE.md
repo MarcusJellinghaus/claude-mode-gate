@@ -42,22 +42,22 @@ Ask questions as plain text in the chat, not with a question tool. Tell me at on
 
 Run everything with `npm run check`. It runs each gate below in order and stops at the first failure. Individual gates:
 
-| Command                   | Gate                                                                           |
-| ------------------------- | ------------------------------------------------------------------------------ |
-| `npm run typecheck`       | `tsc --noEmit`, strict mode                                                    |
-| `npm run lint`            | ESLint, type-aware `strictTypeChecked` rules                                   |
-| `npm run format:check`    | Prettier (`npm run format` fixes)                                              |
-| `npm run arch`            | dependency-cruiser architecture rules; fails when a source file is not cruised |
-| `npm run deadcode`        | knip: unused files, exports, dependencies                                      |
-| `npm run docs:lint`       | markdownlint                                                                   |
-| `npm run check:manifests` | plugin, marketplace and hooks JSON are valid and agree                         |
-| `npm run check:catch`     | every gating hook in `register.ts` has a `.catch`                              |
-| `npm run check:pins`      | workflow actions are pinned to a full commit SHA                               |
-| `npm run check:docs`      | required docs exist (`RELEASE=1` also bans placeholders)                       |
-| `npm run test`            | vitest unit tests                                                              |
-| `npm run test:coverage`   | unit tests with a 95% threshold on `policy.ts`                                 |
-| `npm run test:mutation`   | Stryker mutation tests on `policy.ts` (slow)                                   |
-| `npm run audit`           | `npm audit` at high severity, minus `audit-allowlist.json`                     |
+| Command                   | Gate                                                                                                             |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`       | `tsc --noEmit`, strict mode plus noUncheckedIndexedAccess, exactOptionalPropertyTypes and more; scripts included |
+| `npm run lint`            | ESLint, type-aware `strictTypeChecked` rules                                                                     |
+| `npm run format:check`    | Prettier (`npm run format` fixes)                                                                                |
+| `npm run arch`            | dependency-cruiser architecture rules; fails when a source file is not cruised                                   |
+| `npm run deadcode`        | knip: unused files, exports, dependencies                                                                        |
+| `npm run docs:lint`       | markdownlint                                                                                                     |
+| `npm run check:manifests` | plugin, marketplace and hooks JSON are valid and agree                                                           |
+| `npm run check:catch`     | every gating hook in `register.ts` has a `.catch`                                                                |
+| `npm run check:pins`      | workflow actions are pinned to a full commit SHA                                                                 |
+| `npm run check:docs`      | required docs exist (`RELEASE=1` also bans placeholders)                                                         |
+| `npm run test`            | vitest unit tests                                                                                                |
+| `npm run test:coverage`   | unit tests with a 95% threshold on `policy.ts`                                                                   |
+| `npm run test:mutation`   | Stryker mutation tests on `policy.ts` (slow)                                                                     |
+| `npm run audit`           | `npm audit` at high severity, minus `audit-allowlist.json`                                                       |
 
 These commands are pre-approved in `.claude/settings.json`, so run them freely without asking. Run `npm run check` before every commit.
 
