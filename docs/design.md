@@ -237,7 +237,7 @@ claude-mode-gate/
                     log-format.ts, explain.ts
   types/            index.d.ts
   tests/            unit tests, fixtures/
-  docs/             design.md, mods-api-notes.md, issues-draft/
+  docs/             design.md, mods-api-notes.md
   scripts/          check scripts
 ```
 
@@ -339,7 +339,7 @@ Minimum Claude Code version: 2.1.292, the version the notes were verified agains
 
 ## Work plan
 
-Thirteen issue drafts in `docs/issues-draft/` (see `00-overview.md`).
+Thirteen issues, #3 to #15 (Drafts 01 to 13), tracked by the overview issue #16. "Draft NN" in this document names the issue with that plan id.
 
 1. **Verify.** Draft 01: the small spike over the open rows of [Assumptions](#assumptions), the manifest shape, and how `typecheck` gets the engine's types.
 2. **Build.** `policy.ts` with `decide` and tests first (03), then the config (02), the state and commands (04), the shared path and hook wiring (12), the guards (05), subagent profiles (06), the band and log (07), `/gate-explain` (08) and the built-in profiles (09).

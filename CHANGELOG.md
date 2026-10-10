@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Draft issues for the v1 plan in `docs/issues-draft/`, for review.
+- v1 plan as GitHub issues #3 to #15, tracked by the overview issue #16.
 - Workflow actions are pinned to commit SHAs, enforced by `npm run check:pins`.
 - MIT licence, Dependabot config and a real security policy.
 - Initial repo scaffold.
