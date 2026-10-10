@@ -1,0 +1,7 @@
+node_modules/
+coverage/
+.stryker-tmp/
+reports/
+package-lock.json
+.claude/skills/
+.claude/agents/

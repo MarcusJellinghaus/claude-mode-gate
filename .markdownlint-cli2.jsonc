@@ -1,0 +1,18 @@
+{
+  "config": {
+    "MD013": false,
+    // Rule prefixes such as `git commit ` need a meaningful trailing space inside the code span.
+    "MD038": false,
+    "MD033": false,
+    "MD041": false,
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    ".claude/skills/**",
+    ".claude/agents/**",
+    "node_modules/**",
+    "coverage/**",
+    ".stryker-tmp/**",
+    "reports/**",
+  ],
+}

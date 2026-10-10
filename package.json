@@ -1,0 +1,46 @@
+{
+  "name": "claude-mode-gate",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "A Claude Code mod with switchable permission profiles: a safe baseline and named profiles you switch on and off. Bash that no active rule allows asks. For other tools the mod adds only its own rules and guards; Claude Code's own verdict applies to the rest.",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:mutation": "stryker run",
+    "arch": "depcruise hooks types tests --config .dependency-cruiser.cjs",
+    "deadcode": "knip",
+    "docs:lint": "markdownlint-cli2",
+    "check:manifests": "node scripts/check-manifests.mjs",
+    "check:catch": "node scripts/check-gating-catch.mjs",
+    "check:pins": "node scripts/check-action-pins.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
+    "audit": "node scripts/audit-gate.mjs",
+    "check": "run-s typecheck lint format:check arch deadcode docs:lint check:manifests check:catch check:pins check:docs test:coverage"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "dependency-cruiser": "^16.0.0",
+    "eslint": "^9.0.0",
+    "knip": "^6.40.0",
+    "markdownlint-cli2": "^0.23.3",
+    "npm-run-all2": "^7.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^5.0.3"
+  }
+}

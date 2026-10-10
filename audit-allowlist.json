@@ -1,0 +1,7 @@
+[
+  {
+    "id": "GHSA-vfj7-8cjw-p6xm",
+    "reason": "braces has no upstream fix; reached only through markdownlint-cli2 (dev tooling), not shipped",
+    "issue": 2
+  }
+]

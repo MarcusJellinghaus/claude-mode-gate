@@ -1,0 +1,11 @@
+{
+  "name": "claude-mode-gate",
+  "owner": { "name": "Marcus Jellinghaus" },
+  "plugins": [
+    {
+      "name": "mode-gate",
+      "source": "./",
+      "description": "Switchable permission profiles for Claude Code."
+    }
+  ]
+}

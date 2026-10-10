@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "mcp-workspace": {
+      "type": "stdio",
+      "command": "${MCP_CODER_VENV_PATH}/mcp-workspace",
+      "args": [
+        "--project-dir",
+        "${MCP_CODER_PROJECT_DIR}",
+        "--log-level",
+        "INFO",
+        "--file-size-limit",
+        "750",
+        "--reference-project",
+        "name=mcp-coder,path=${HOME}/Documents/VSCC/mcp_coder_1179,url=https://github.com/MarcusJellinghaus/mcp_coder"
+      ],
+      "env": {
+        "PYTHONPATH": "${MCP_CODER_VENV_DIR}/lib"
+      },
+      "alwaysLoad": true
+    }
+  }
+}
