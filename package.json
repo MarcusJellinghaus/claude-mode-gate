@@ -28,7 +28,7 @@
     "check": "run-s typecheck lint format:check arch deadcode docs:lint check:manifests check:catch check:pins check:docs test:coverage"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
+    "@eslint/js": "^10.0.1",
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/node": "^22.0.0",
