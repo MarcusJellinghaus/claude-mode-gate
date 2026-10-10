@@ -6,7 +6,7 @@
   "license": "MIT",
   "description": "A Claude Code mod with switchable permission profiles: a safe baseline and named profiles you switch on and off. Bash that no active rule allows asks. For other tools the mod adds only its own rules and guards; Claude Code's own verdict applies to the rest.",
   "engines": {
-    "node": ">=22.12"
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Node floor raised to match the dependency tree, with .node-version and engine-strict.
 - v1 plan as GitHub issues #3 to #15, tracked by the overview issue #16.
 - Workflow actions are pinned to commit SHAs, enforced by `npm run check:pins`.
 - MIT licence, Dependabot config and a real security policy.
