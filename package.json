@@ -17,7 +17,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "stryker run",
-    "arch": "depcruise hooks types tests --config .dependency-cruiser.cjs",
+    "arch": "depcruise hooks types tests --config .dependency-cruiser.cjs && node scripts/check-arch-modules.mjs",
     "deadcode": "knip",
     "docs:lint": "markdownlint-cli2",
     "check:manifests": "node scripts/check-manifests.mjs",
