@@ -7,9 +7,12 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     groups:
-      dev-minor-patch:
-        dependency-type: development
+      npm-minor-and-patch:
+        patterns: ["*"]
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: deps
   - package-ecosystem: github-actions
