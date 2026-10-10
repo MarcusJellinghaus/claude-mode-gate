@@ -8,7 +8,8 @@ const source = readFileSync("hooks/register.ts", "utf8");
 
 // Each registration must contain a .catch( before the next registration or the end of the file.
 const pattern = /\$\.on\(\s*["']([\w.]+)["']/g;
-const starts = [...source.matchAll(pattern)].map((m) => ({ event: m[1], index: m.index }));
+const starts = [...source.matchAll(pattern)].map((m) => ({ event: m[1] ?? "", index: m.index }));
+/** @type {string[]} */
 const problems = [];
 
 starts.forEach((start, i) => {
@@ -23,4 +24,4 @@ if (problems.length > 0) {
   console.error(problems.map((p) => `check:catch: ${p}`).join("\n"));
   process.exit(1);
 }
-console.log(`check:catch: ok (${starts.length} registrations scanned)`);
+console.log(`check:catch: ok (${String(starts.length)} registrations scanned)`);

@@ -1,6 +1,7 @@
 // Documentation-done gate: required files exist and, for a release, hold no placeholders.
 import { existsSync, readFileSync } from "node:fs";
 
+/** @type {string[]} */
 const problems = [];
 const required = ["README.md", "SECURITY.md", "CHANGELOG.md", "CLAUDE.md"];
 for (const file of required) {
@@ -13,7 +14,7 @@ if (!/^## Unreleased/m.test(changelog)) {
 }
 
 // Placeholders are fine pre-release. Run with RELEASE=1 to require finished docs and a licence.
-if (process.env.RELEASE === "1") {
+if (process.env["RELEASE"] === "1") {
   for (const file of required.filter((f) => existsSync(f))) {
     if (/_To be written\._|_Contact details to be added/.test(readFileSync(file, "utf8"))) {
       problems.push(`${file} still contains placeholder text`);

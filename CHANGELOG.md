@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Stricter TypeScript flags; scripts are type-checked.
 - `npm run arch` fails when dependency-cruiser does not cruise a source file, instead of passing on zero modules.
 - Node floor raised to match the dependency tree, with .node-version and engine-strict.
 - v1 plan as GitHub issues #3 to #15, tracked by the overview issue #16.

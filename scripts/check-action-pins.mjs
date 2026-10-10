@@ -7,9 +7,13 @@ const WORKFLOWS_DIR = ".github/workflows";
 const USES = /^\s*(?:-\s+)?uses:\s*["']?([^\s"'#]+)/gm;
 const PINNED = /@[0-9a-f]{40}$/;
 
+/**
+ * @param {string} workflowText
+ * @returns {string[]}
+ */
 export function findUnpinned(workflowText) {
   return [...workflowText.matchAll(USES)]
-    .map((match) => match[1])
+    .map((match) => match[1] ?? "")
     .filter((ref) => !ref.startsWith("./") && !ref.startsWith("docker://") && !PINNED.test(ref));
 }
 
