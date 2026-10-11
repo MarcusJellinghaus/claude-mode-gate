@@ -27,6 +27,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Claude Code lays the engine's `claude-code` types when it loads the mod; no login is needed.
+      - run: npm install --global @anthropic-ai/claude-code@2.1.292
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
@@ -63,8 +65,8 @@ jobs:
       - run: npm run check:manifests
       - run: npm run check:catch
       - run: npm run check:pins
-      # TODO: add `claude plugin validate` and `claude plugin test`, pinned to a Claude Code
-      # version, once the CLI commands are verified (docs/design.md, "Work plan").
+      # TODO (Draft 10): add `claude plugin validate` and `claude plugin test`, pinned to a Claude
+      # Code version. Both run without a login (docs/design.md, "Assumptions", row 23).
 
   docs:
     name: Documentation

@@ -2,7 +2,9 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["node_modules/", "coverage/", ".stryker-tmp/", "reports/"] },
+  {
+    ignores: ["node_modules/", "coverage/", ".stryker-tmp/", "reports/", ".claude-plugin/types/"],
+  },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {
