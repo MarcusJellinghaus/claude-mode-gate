@@ -14,6 +14,8 @@
     "noPropertyAccessFromIndexSignature": true,
     "allowJs": true,
     "checkJs": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
     "noEmit": true,
     "skipLibCheck": true
   },

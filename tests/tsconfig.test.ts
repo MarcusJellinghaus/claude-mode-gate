@@ -18,6 +18,8 @@ describe("tsconfig.json", () => {
     "noPropertyAccessFromIndexSignature",
     "allowJs",
     "checkJs",
+    "verbatimModuleSyntax",
+    "erasableSyntaxOnly",
   ])("enables %s", (flag) => {
     expect(tsconfig.compilerOptions[flag]).toBe(true);
   });
