@@ -22,6 +22,13 @@ describe("tsconfig.json", () => {
     expect(tsconfig.compilerOptions[flag]).toBe(true);
   });
 
+  it("resolves the engine's claude-code types from the folder the engine lays them in", () => {
+    expect(tsconfig.compilerOptions["typeRoots"]).toContain("./.claude-plugin/types");
+    expect(tsconfig.compilerOptions["types"]).toEqual(
+      expect.arrayContaining(["claude-code", "claude-code-tools", "claude-code-mcp", "node"]),
+    );
+  });
+
   it("type-checks the scripts", () => {
     expect(tsconfig.include).toContain("scripts");
   });

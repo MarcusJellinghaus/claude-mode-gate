@@ -15,6 +15,10 @@ Start Claude with `claude.bat` (Windows) or `claude.sh` (macOS, Linux), not bare
 
 If you can't name the gap, use the MCP tool. Exempt: the approved `npm run` check commands and `git add/commit/push` for the standing commit-and-push workflow. Subagents follow the same rule.
 
+Put the same two lines at the top of the call itself, in the Bash `description`, so they show where the command is approved. Keep Bash to a minimum: batch the steps into one scripted call, and read logs and output files with `read_file` or `search_files`, or the native `Read` and `Grep` outside the project, never with shell `cat` or `grep`. Do not ask in chat before a Bash call. The permission prompt is the one approval, and the `description` is the reasoning the user reads there.
+
+**Scratch files.** MCP tools can't write outside the project, so the session scratchpad is out of reach for them. Temporary files go in `.scratch/`. It is not gitignored, because the MCP file tools refuse ignored paths, so delete it before committing. Exception: a file that must live outside the repo (the probes of the API spike, issue #3) goes in the session scratchpad. So does reading a file outside the project, such as the engine's type declarations. Use the native `Read`, `Write`, `Edit` and `Grep` for those, with Bash to run them, and justify each use like a Bash call.
+
 | Task                            | MCP tool                                                                                              |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Read, edit, write, append files | `read_file`, `edit_file`, `save_file`, `append_file`                                                  |
@@ -42,22 +46,22 @@ Ask questions as plain text in the chat, not with a question tool. Tell me at on
 
 Run everything with `npm run check`. It runs each gate below in order and stops at the first failure. Individual gates:
 
-| Command                   | Gate                                                                                                             |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `npm run typecheck`       | `tsc --noEmit`, strict mode plus noUncheckedIndexedAccess, exactOptionalPropertyTypes and more; scripts included |
-| `npm run lint`            | ESLint, type-aware `strictTypeChecked` rules                                                                     |
-| `npm run format:check`    | Prettier (`npm run format` fixes)                                                                                |
-| `npm run arch`            | dependency-cruiser architecture rules; fails when a source file is not cruised                                   |
-| `npm run deadcode`        | knip: unused files, exports, dependencies                                                                        |
-| `npm run docs:lint`       | markdownlint                                                                                                     |
-| `npm run check:manifests` | plugin, marketplace and hooks JSON are valid and agree                                                           |
-| `npm run check:catch`     | every gating hook in `register.ts` has a `.catch`                                                                |
-| `npm run check:pins`      | workflow actions are pinned to a full commit SHA                                                                 |
-| `npm run check:docs`      | required docs exist (`RELEASE=1` also bans placeholders)                                                         |
-| `npm run test`            | vitest unit tests                                                                                                |
-| `npm run test:coverage`   | unit tests with a 95% threshold on `policy.ts`                                                                   |
-| `npm run test:mutation`   | Stryker mutation tests on `policy.ts` (slow)                                                                     |
-| `npm run audit`           | `npm audit` at high severity, minus `audit-allowlist.json`                                                       |
+| Command                   | Gate                                                                                                                                                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run typecheck`       | Lays the engine's types if missing (`npm run types:lay` forces it; needs Claude Code on the PATH), then `tsc --noEmit`, strict mode plus noUncheckedIndexedAccess, exactOptionalPropertyTypes and more; scripts included |
+| `npm run lint`            | ESLint, type-aware `strictTypeChecked` rules                                                                                                                                                                             |
+| `npm run format:check`    | Prettier (`npm run format` fixes)                                                                                                                                                                                        |
+| `npm run arch`            | dependency-cruiser architecture rules; fails when a source file is not cruised                                                                                                                                           |
+| `npm run deadcode`        | knip: unused files, exports, dependencies                                                                                                                                                                                |
+| `npm run docs:lint`       | markdownlint                                                                                                                                                                                                             |
+| `npm run check:manifests` | plugin, marketplace and hooks JSON are valid and agree                                                                                                                                                                   |
+| `npm run check:catch`     | every gating hook in `register.ts` has a `.catch`                                                                                                                                                                        |
+| `npm run check:pins`      | workflow actions are pinned to a full commit SHA                                                                                                                                                                         |
+| `npm run check:docs`      | required docs exist (`RELEASE=1` also bans placeholders)                                                                                                                                                                 |
+| `npm run test`            | vitest unit tests                                                                                                                                                                                                        |
+| `npm run test:coverage`   | unit tests with a 95% threshold on `policy.ts`                                                                                                                                                                           |
+| `npm run test:mutation`   | Stryker mutation tests on `policy.ts` (slow)                                                                                                                                                                             |
+| `npm run audit`           | `npm audit` at high severity, minus `audit-allowlist.json`                                                                                                                                                               |
 
 These commands are pre-approved in `.claude/settings.json`, so run them freely without asking. Run `npm run check` before every commit.
 

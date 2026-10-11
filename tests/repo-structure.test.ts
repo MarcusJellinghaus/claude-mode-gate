@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const read = (path: string): string => readFileSync(path, "utf8");
@@ -8,6 +8,16 @@ describe("repo structure", () => {
     const source = read("hooks/policy.ts");
     expect(source).not.toMatch(/\$\.(state|store|ui|on)\b/);
     expect(source).not.toMatch(/^\s*import\s/m);
+  });
+
+  it("names exactly one hooks module, and the file exists", () => {
+    const hooks = JSON.parse(read("hooks/hooks.json")) as { modules?: string[] };
+    expect(hooks.modules).toEqual(["./register.ts"]);
+    expect(existsSync("hooks/register.ts")).toBe(true);
+  });
+
+  it("types the hooks module as Register", () => {
+    expect(read("hooks/register.ts")).toMatch(/export const register: Register\b/);
   });
 
   it("ships valid JSON manifests that agree on the plugin name", () => {

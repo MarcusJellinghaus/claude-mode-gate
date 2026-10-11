@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- API spike (Draft 01, #3): every assumption in `docs/design.md` has a status and evidence, tested against Claude Code 2.1.292. Findings that change the design: a repo's `.claude/settings.json` `env` reaches the mod, and a module that fails to load leaves everything ungated.
+- `hooks/hooks.json` names the one hooks module, `register.ts` is typed `Register`, and `npm run check:manifests` enforces both.
+- `npm run typecheck` lays the engine's `claude-code` types with `scripts/lay-types.mjs` (`npm run types:lay` forces it); CI installs Claude Code 2.1.292.
 - Stricter TypeScript flags; scripts are type-checked.
 - `npm run arch` fails when dependency-cruiser does not cruise a source file, instead of passing on zero modules.
 - Node floor raised to match the dependency tree, with .node-version and engine-strict.

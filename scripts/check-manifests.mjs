@@ -1,7 +1,8 @@
 // Validates the plugin and marketplace manifests until `claude plugin validate` is wired into CI.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-/** @typedef {{ name?: string, version?: string, description?: string, plugins?: { name: string }[] }} Manifest */
+/** @typedef {{ name?: string, version?: string, description?: string, plugins?: { name: string }[], modules?: unknown }} Manifest */
 
 /** @type {string[]} */
 const errors = [];
@@ -40,6 +41,18 @@ if (!Array.isArray(market?.plugins) || !market.plugins.some((p) => p.name === pl
 }
 if (hooks === undefined || typeof hooks !== "object" || Array.isArray(hooks)) {
   errors.push("hooks/hooks.json: must be a JSON object");
+} else {
+  // Claude Code refuses a second entry: "modules" names one hooks module per plugin.
+  const { modules } = hooks;
+  const entry =
+    Array.isArray(modules) && modules.length === 1
+      ? /** @type {unknown} */ (modules[0])
+      : undefined;
+  if (typeof entry !== "string") {
+    errors.push('hooks/hooks.json: "modules" must name exactly one hooks module');
+  } else if (!existsSync(resolve("hooks", entry))) {
+    errors.push(`hooks/hooks.json: module ${entry} does not exist`);
+  }
 }
 
 if (errors.length > 0) {

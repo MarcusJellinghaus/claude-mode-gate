@@ -2,6 +2,7 @@ node_modules/
 coverage/
 .stryker-tmp/
 reports/
+.claude-plugin/types/
 package-lock.json
 .claude/skills/
 .claude/agents/

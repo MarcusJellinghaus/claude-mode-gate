@@ -9,7 +9,8 @@
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "types:lay": "node scripts/lay-types.mjs --force",
+    "typecheck": "node scripts/lay-types.mjs && tsc --noEmit",
     "lint": "eslint .",
     "format:check": "prettier --check .",
     "format": "prettier --write .",

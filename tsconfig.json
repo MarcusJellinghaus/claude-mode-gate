@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    "lib": ["ES2023"],
+    "typeRoots": ["./.claude-plugin/types", "./node_modules/@types"],
+    "types": ["claude-code", "claude-code-tools", "claude-code-mcp", "node"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
