@@ -20,6 +20,13 @@ describe("repo structure", () => {
     expect(read("hooks/register.ts")).toMatch(/export const register: Register\b/);
   });
 
+  it("names an author and describes the marketplace, so `claude plugin validate --strict` passes", () => {
+    const plugin = JSON.parse(read(".claude-plugin/plugin.json")) as { author?: { name?: string } };
+    const market = JSON.parse(read(".claude-plugin/marketplace.json")) as { description?: string };
+    expect(plugin.author?.name).toBeTruthy();
+    expect(market.description).toBeTruthy();
+  });
+
   it("ships valid JSON manifests that agree on the plugin name", () => {
     const plugin = JSON.parse(read(".claude-plugin/plugin.json")) as { name: string };
     const market = JSON.parse(read(".claude-plugin/marketplace.json")) as {

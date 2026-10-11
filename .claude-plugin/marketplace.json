@@ -1,5 +1,6 @@
 {
   "name": "claude-mode-gate",
+  "description": "Claude Code mods by Marcus Jellinghaus: switchable permission profiles that gate Claude's tool calls.",
   "owner": { "name": "Marcus Jellinghaus" },
   "plugins": [
     {
