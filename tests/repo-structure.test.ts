@@ -16,6 +16,11 @@ describe("repo structure", () => {
     expect(existsSync("hooks/register.ts")).toBe(true);
   });
 
+  it("keeps CLAUDE.md under .claude/, because a root CLAUDE.md fails `claude plugin validate --strict`", () => {
+    expect(existsSync(".claude/CLAUDE.md")).toBe(true);
+    expect(existsSync("CLAUDE.md")).toBe(false);
+  });
+
   it("types the hooks module as Register", () => {
     expect(read("hooks/register.ts")).toMatch(/export const register: Register\b/);
   });

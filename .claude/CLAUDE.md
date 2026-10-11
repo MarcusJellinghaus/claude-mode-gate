@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-claude-mode-gate is a Claude Code mod (TypeScript, strict mode) with switchable permission profiles. Goals, decisions and open items live in [docs/design.md](docs/design.md). Read it first.
+claude-mode-gate is a Claude Code mod (TypeScript, strict mode) with switchable permission profiles. Goals, decisions and open items live in [docs/design.md](../docs/design.md). Read it first.
 
 ## MCP tools
 

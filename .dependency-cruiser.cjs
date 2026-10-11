@@ -1,4 +1,4 @@
-/** Architecture rules. See CLAUDE.md, "Architecture rules". */
+/** Architecture rules. See .claude/CLAUDE.md, "Architecture rules". */
 module.exports = {
   forbidden: [
     {

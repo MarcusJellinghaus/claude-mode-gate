@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 /** @type {string[]} */
 const problems = [];
-const required = ["README.md", "SECURITY.md", "CHANGELOG.md", "CLAUDE.md"];
+const required = ["README.md", "SECURITY.md", "CHANGELOG.md", ".claude/CLAUDE.md"];
 for (const file of required) {
   if (!existsSync(file)) problems.push(`${file} is missing`);
 }
