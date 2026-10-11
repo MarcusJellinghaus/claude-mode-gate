@@ -5,6 +5,11 @@ claude-mode-gate. The API is early access and moves between releases, so the
 declaration file is the authority. Part of [design.md](design.md); the
 "Assumptions" table there cites the claim numbers below.
 
+The spike of 11 October 2026 (Draft 01) tested several of these claims at runtime.
+Where it differs, [design.md](design.md) "Assumptions" wins: claim 8 on re-entry
+(no re-entry was observed; `$.fs` calls raise no tool event) and the note on a
+module that fails to load (nothing is gated, verified).
+
 The path of the types file below is regenerated per process and is not stable.
 Do not hard-code it anywhere; load the `plugin-authoring` skill to get the
 current path.
