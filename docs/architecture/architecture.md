@@ -4,15 +4,15 @@ claude-mode-gate is a Claude Code mod: one hooks module that the engine loads fr
 
 ## Modules
 
-| Path                | Role                                                                                                       |
-| ------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `hooks/policy.ts`   | The decision: a pure function from a tool call, the active profiles and Claude Code's verdict to a verdict |
-| `hooks/register.ts` | Thin wiring: registers the hooks with the engine and calls `policy.ts`                                     |
-| `hooks/hooks.json`  | Names the one hooks module                                                                                 |
-| `types/`            | Shared type declarations                                                                                   |
-| `.claude-plugin/`   | Plugin and marketplace manifests; `types/` there is laid by Claude Code and never committed                |
-| `scripts/`          | Repo gates run by `npm run` (audit, manifests, fail-closed catch, action pins, docs, engine types)         |
-| `tests/`            | vitest tests, one file per module                                                                          |
+| Path                | Role                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `hooks/policy.ts`   | The decision: a pure function from a tool call, the active profiles and Claude Code's verdict to a verdict    |
+| `hooks/register.ts` | Thin wiring: registers the hooks with the engine and calls `policy.ts`                                        |
+| `hooks/hooks.json`  | Names the one hooks module                                                                                    |
+| `types/`            | Shared type declarations                                                                                      |
+| `.claude-plugin/`   | Plugin and marketplace manifests; `types/` there is laid by Claude Code and never committed                   |
+| `scripts/`          | Repo gates run by `npm run` (full gate, audit, manifests, fail-closed catch, action pins, docs, engine types) |
+| `tests/`            | vitest tests, one file per module                                                                             |
 
 ## Rules
 

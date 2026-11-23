@@ -54,7 +54,7 @@ Ask questions as plain text in the chat, not with a question tool. Tell me at on
 
 ## Commands
 
-Run everything with `npm run check`. It runs each gate below in order and stops at the first failure. Individual gates:
+Run everything with `npm run check`. It runs each gate below in order (`scripts/check.mjs`) and stops at the first failure. It prints one line per gate and only the failing gate's last 60 lines, so read its output as it is, without `tail` or `grep`. Individual gates:
 
 | Command                   | Gate                                                                                                                                                                                                                     |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
