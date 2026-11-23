@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Dev dependencies fixed for four high advisories: markdown-it and zod via updates, and `re2js` via an `overrides` entry until markdownlint drops its 2.8.6 pin. The withdrawn `braces` advisory left the allowlist, which is now empty (closes #2).
 - API spike (Draft 01, #3): every assumption in `docs/design.md` has a status and evidence, tested against Claude Code 2.1.292. Findings that change the design: a repo's `.claude/settings.json` `env` reaches the mod, and a module that fails to load leaves everything ungated.
 - `plugin.json` names an author, `marketplace.json` has a description, and `CLAUDE.md` moved to `.claude/CLAUDE.md`, so `claude plugin validate --strict` passes.
 - `verbatimModuleSyntax` and `erasableSyntaxOnly` are on: the engine compiles the mod's TypeScript and accepts both.
