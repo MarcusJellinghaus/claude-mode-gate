@@ -3,7 +3,7 @@
 ## Unreleased
 
 - `.claude/settings.json` no longer sets the mcp-workspace variables. Its hard-coded `MCP_CODER_PROJECT_DIR` had a typo and overrode the launcher, so the server never started. `claude.bat` and `claude.sh` set them, as in mcp-coder.
-- The mcp-coder reference project points at `~/Documents/GitHub/mcp_coder` in all three MCP configs.
+- The mcp-coder reference project points at `~/Documents/GitHub/mcp_coder` in all three MCP configs, and `mcp-tools-py` is added as a second reference project.
 - `npm run typecheck` lays the engine types with Claude Code 2.1.323 and newer too: `scripts/lay-types.mjs` sets `CLAUDE_CODE_PLUGIN_DIR_WATCH=1`, without which `claude -p` no longer writes them.
 - Dev dependencies fixed for four high advisories: markdown-it and zod via updates, and `re2js` via an `overrides` entry until markdownlint drops its 2.8.6 pin. The withdrawn `braces` advisory left the allowlist, which is now empty (closes #2).
 - API spike (Draft 01, #3): every assumption in `docs/design.md` has a status and evidence, tested against Claude Code 2.1.292. Findings that change the design: a repo's `.claude/settings.json` `env` reaches the mod, and a module that fails to load leaves everything ungated.

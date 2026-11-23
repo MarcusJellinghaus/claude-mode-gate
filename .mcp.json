@@ -11,7 +11,9 @@
         "--file-size-limit",
         "750",
         "--reference-project",
-        "name=mcp-coder,path=${USERPROFILE}\\Documents\\GitHub\\mcp_coder,url=https://github.com/MarcusJellinghaus/mcp_coder"
+        "name=mcp-coder,path=${USERPROFILE}\\Documents\\GitHub\\mcp_coder,url=https://github.com/MarcusJellinghaus/mcp_coder",
+        "--reference-project",
+        "name=mcp-tools-py,path=${USERPROFILE}\\Documents\\GitHub\\mcp-tools-py,url=https://github.com/MarcusJellinghaus/mcp-tools-py"
       ],
       "env": {
         "PYTHONPATH": "${MCP_CODER_VENV_DIR}\\Lib\\"

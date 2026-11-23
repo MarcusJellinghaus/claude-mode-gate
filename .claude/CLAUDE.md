@@ -29,7 +29,7 @@ Put the same two lines at the top of the call itself, in the Bash `description`,
 | Branch status, size checks      | `check_branch_status`, `get_base_branch`, `check_file_size`                                           |
 | Reference projects              | `get_reference_projects`, `read_reference_file`, `list_reference_directory`, `search_reference_files` |
 
-**Reference project:** `mcp-coder` (local clone at `~/Documents/GitHub/mcp_coder`). It is the model for the skills, agents and launcher scripts copied into this repo. Check it before asking how something is done there.
+**Reference project:** `mcp-coder` (local clone at `~/Documents/GitHub/mcp_coder`). It is the model for the skills, agents and launcher scripts copied into this repo. Check it before asking how something is done there. `mcp-tools-py` (`~/Documents/GitHub/mcp-tools-py`) is the model for the code-quality MCP tools.
 
 **Skills and agents** in `.claude/skills` and `.claude/agents` are copied from mcp-coder. The Python tools (`mcp-tools-py`) are replaced by the matching `npm run` scripts: format → `npm run format`, pylint and ruff → `npm run lint`, mypy → `npm run typecheck`, pytest → `npm run test`, vulture → `npm run deadcode`, import-linter → `npm run arch`. The sleep tool is dropped; the skills no longer wait. They still assume mcp-coder's `mcp-coder gh-tool` for issue status and `.claude/knowledge_base/*.md`, which this repo does not have. The three agents run with `bypassPermissions`. Review them before relying on them here.
 
