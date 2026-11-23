@@ -1,0 +1,31 @@
+# mcp-coder workflow config for this npm repo (mcp-coder docs: configuration/toolkits.md, setup.md).
+# Tests report by exit code: vitest writes no JUnit report here.
+
+[tool.mcp-coder.setup]
+steps = [ { name = "deps", argv = ["npm", "ci"] } ]
+
+[tool.mcp-coder.toolkit]
+toolkit = "command"
+
+[tool.mcp-coder.toolkit.command]
+llm_permissions = "bash"
+parser = "exit-code"
+exit_codes = { 0 = "ok", 1 = "findings" }
+
+[tool.mcp-coder.toolkit.command.format]
+apply = [ { argv = ["npm", "run", "format"] } ]
+check = [ { argv = ["npm", "run", "format:check"] } ]
+
+[tool.mcp-coder.toolkit.command.check]
+quick    = [ { argv = ["npm", "run", "typecheck"] },
+             { argv = ["npm", "run", "lint"] } ]
+standard = [ { argv = ["npm", "run", "check"] } ]
+full     = [ { argv = ["npm", "run", "check"] },
+             { argv = ["npm", "run", "audit"] } ]
+
+[tool.mcp-coder.toolkit.command.test]
+quick      = [ { argv = ["npm", "run", "test"] } ]
+standard   = [ { argv = ["npm", "run", "test"] } ]
+full       = [ { argv = ["npm", "run", "test:coverage"] } ]
+unattended = [ { argv = ["npm", "run", "test"] } ]
+mutation   = [ { argv = ["npm", "run", "test:mutation"], timeout = 3600 } ]
