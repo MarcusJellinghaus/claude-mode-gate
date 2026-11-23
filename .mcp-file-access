@@ -2,6 +2,11 @@
 # <level> <gitignore pattern>; levels: read-only, read-write; last match wins
 read-only   /.vscodeclaude_status.txt
 read-only   /.mcp.json
+read-only   /.mcp.linux.json
+read-only   /.mcp.macos.json
 read-only   /.claude/settings.json
 read-only   /.claude/settings.local.json
 read-write  /.scratch/
+# Gitignored, but needed for reading: the engine's types and dependency sources
+read-only   /.claude-plugin/types/
+read-only   /node_modules/

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - `npm run check` runs the gates with `scripts/check.mjs` instead of `run-s`: one line per gate, and only the failing gate's last 60 lines, without colour codes. `npm-run-all2` is gone.
+- `npm run format` lists only the files it changed. `.claude/settings.json` follows mcp-coder's allow list (MCP file, read and Obsidian tools, WebFetch, skills); `npm run test:mutation`, `npm ci` and Bash git writes now ask. `.mcp-file-access` also protects the platform MCP configs and exposes the engine types and `node_modules` read-only. `CLAUDE.md` has a full tool mapping.
 - Synced with mcp-coder (chore list #40): skills and agents refreshed with `mcp-coder init --just-skills` and re-adapted to the `npm run` scripts; the three missing supervisor agents, the knowledge base, `pr_comment_triage`, `.mcp-file-access` and `mcp-coder.toml` added; the agents use scoped hooks instead of `bypassPermissions`; `docs/architecture/architecture.md` maps the code.
 - `.claude/settings.json` no longer sets the mcp-workspace variables. Its hard-coded `MCP_CODER_PROJECT_DIR` had a typo and overrode the launcher, so the server never started. `claude.bat` and `claude.sh` set them, as in mcp-coder.
 - The mcp-coder reference project points at `~/Documents/GitHub/mcp_coder` in all three MCP configs, and `mcp-tools-py` is added as a second reference project.

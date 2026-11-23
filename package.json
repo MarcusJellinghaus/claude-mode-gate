@@ -13,7 +13,7 @@
     "typecheck": "node scripts/lay-types.mjs && tsc --noEmit",
     "lint": "eslint .",
     "format:check": "prettier --check .",
-    "format": "prettier --write .",
+    "format": "prettier --write --list-different .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
