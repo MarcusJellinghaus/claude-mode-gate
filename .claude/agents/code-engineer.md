@@ -25,6 +25,12 @@ tools:
   - mcp__mcp-workspace__github_search
   - mcp__mcp-workspace__github_subissue_list
   - Bash
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: 'node "$CLAUDE_PROJECT_DIR/scripts/agent-bash-guard.mjs" check typecheck lint test format format:check arch deadcode'
 skills:
   - implementation_review
   - check_branch_status

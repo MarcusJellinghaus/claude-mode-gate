@@ -23,6 +23,12 @@ tools:
   - mcp__mcp-workspace__github_search
   - mcp__mcp-workspace__github_subissue_list
   - Bash
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: 'node "$CLAUDE_PROJECT_DIR/scripts/agent-bash-guard.mjs" check typecheck lint test format'
 skills:
   - plan_review
   - plan_update

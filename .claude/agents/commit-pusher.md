@@ -9,6 +9,10 @@ tools:
   - mcp__mcp-workspace__read_file
 hooks:
   PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: 'node "$CLAUDE_PROJECT_DIR/scripts/agent-bash-guard.mjs" format'
     - matcher: "mcp__mcp-workspace__git_commit|mcp__mcp-workspace__git_push"
       hooks:
         - type: command

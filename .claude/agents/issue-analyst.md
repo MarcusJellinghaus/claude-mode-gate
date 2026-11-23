@@ -19,6 +19,12 @@ tools:
   - mcp__mcp-workspace__delete_this_file
   - mcp__mcp-workspace__delete_directory
   - Bash
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: 'node "$CLAUDE_PROJECT_DIR/scripts/agent-bash-guard.mjs" check typecheck lint test'
 skills:
   - issue_analyse
 ---
