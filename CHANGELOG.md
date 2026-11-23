@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Synced with mcp-coder (chore list #40): skills and agents refreshed with `mcp-coder init --just-skills` and re-adapted to the `npm run` scripts; the three missing supervisor agents, the knowledge base, `pr_comment_triage`, `.mcp-file-access` and `mcp-coder.toml` added; the agents use scoped hooks instead of `bypassPermissions`; `docs/architecture/architecture.md` maps the code.
 - `.claude/settings.json` no longer sets the mcp-workspace variables. Its hard-coded `MCP_CODER_PROJECT_DIR` had a typo and overrode the launcher, so the server never started. `claude.bat` and `claude.sh` set them, as in mcp-coder.
 - The mcp-coder reference project points at `~/Documents/GitHub/mcp_coder` in all three MCP configs, and `mcp-tools-py` is added as a second reference project.
 - `npm run typecheck` lays the engine types with Claude Code 2.1.323 and newer too: `scripts/lay-types.mjs` sets `CLAUDE_CODE_PLUGIN_DIR_WATCH=1`, without which `claude -p` no longer writes them.
