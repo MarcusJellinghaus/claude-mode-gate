@@ -24,7 +24,9 @@ current path.
 - Long form: `.../plugin-authoring/reference.md` (same folder).
 - Skill entry point (not on disk, loaded through the Skill tool): `plugin-authoring`.
 - Example: `.../plugin-authoring/examples/tool-call.ts`.
-- Once the engine has loaded a mod from a mods folder or `--plugin-dir`, the same
+- Once the engine has loaded a mod from a folder it watches (a mods folder, or a
+  `--plugin-dir`; from 2.1.323 `claude -p` watches one only with
+  `CLAUDE_CODE_PLUGIN_DIR_WATCH=1`), the same
   types are laid in `<mod>/.claude-plugin/types/claude-code/index.d.ts` and
   `claude-code-tools/index.d.ts`, with a `tsconfig.json` the mod extends.
 - Line numbers below refer to `claude-code.d.ts`.
