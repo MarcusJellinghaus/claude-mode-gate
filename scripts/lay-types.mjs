@@ -1,6 +1,7 @@
 // Lays the engine's `claude-code` types under .claude-plugin/types/ so `tsc` can resolve them.
-// Claude Code writes them whenever it loads the mod, before it checks the login, so a `claude -p`
-// run that fails to authenticate is enough (docs/design.md, "Assumptions", rows 16 and 23).
+// Claude Code writes them when it loads the mod from a folder it watches, before it checks the
+// login, so a `claude -p` run that fails to authenticate is enough (docs/design.md,
+// "Assumptions", rows 16 and 23).
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -21,13 +22,27 @@ export function layTypes({ exists, run, force = false }) {
   };
 }
 
+/**
+ * A placeholder key makes the run fail at the login check instead of calling the model.
+ * From 2.1.323 Claude Code lays the types only in a plugin folder it watches, and
+ * `claude -p` watches a `--plugin-dir` only when CLAUDE_CODE_PLUGIN_DIR_WATCH is 1.
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {NodeJS.ProcessEnv}
+ */
+export function claudeEnv(env) {
+  return {
+    ...env,
+    ANTHROPIC_API_KEY: "sk-ant-placeholder-so-no-model-call",
+    CLAUDE_CODE_PLUGIN_DIR_WATCH: "1",
+  };
+}
+
 /** @returns {number} */
 function runClaude() {
   // The exit code is ignored: the run fails at the login check, after the types are laid.
-  // A placeholder key makes it fail at once instead of calling the model.
   const result = spawnSync("claude", ["-p", "ok", "--plugin-dir", ".", "--strict-mcp-config"], {
     stdio: "ignore",
-    env: { ...process.env, ANTHROPIC_API_KEY: "sk-ant-placeholder-so-no-model-call" },
+    env: claudeEnv(process.env),
   });
   return result.status ?? 1;
 }
