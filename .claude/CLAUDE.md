@@ -15,7 +15,7 @@ Start Claude with `claude.bat` (Windows) or `claude.sh` (macOS, Linux), not bare
 
 If you can't name the gap, use the MCP tool. Exempt: the approved `npm run` scripts (see Commands). Put the same two lines in the Bash `description`, where the permission prompt shows them. Do not ask in chat before a Bash call: the prompt is the one approval. Subagents follow the same rule. Read logs and output files with `read_file` or `search_files`, never with shell `cat`, `tail` or `grep`.
 
-**Protected files** (`.mcp*.json`, `.claude/settings*.json`, `.mcp-file-access`): MCP refuses writes to them by design. A refusal is not a gap: stop and ask the user. Edit them with the native `Edit` or `Write` only when the user says so, never with Bash or PowerShell.
+**Protected files** (`.mcp*.json`, `.claude/settings*.json`, `.mcp-file-access`): MCP refuses writes to them by design. Stop and ask the user to edit the file. A refusal is not a gap, so never fall back to native Edit, Write, Bash or PowerShell.
 
 **Scratch files** go in `.scratch/`: gitignored, and writable for MCP through its `read-write` rule in `.mcp-file-access`. Delete it when done. Only a file that must live outside the repo (the API spike's probes, issue #3) goes in the session scratchpad.
 
