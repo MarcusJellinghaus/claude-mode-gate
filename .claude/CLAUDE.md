@@ -6,18 +6,20 @@ claude-mode-gate is a Claude Code mod (TypeScript, strict mode) with switchable 
 
 Start Claude with `claude.bat` (Windows) or `claude.sh` (macOS, Linux), not bare `claude`. The launcher finds the `mcp-workspace` install and sets `MCP_CODER_VENV_PATH`, `MCP_CODER_VENV_DIR`, `MCP_CODER_PROJECT_DIR`, `DISABLE_AUTOUPDATER` and `MCP_TIMEOUT`, which `.mcp.json` needs. `.mcp.linux.json` and `.mcp.macos.json` are the platform variants.
 
-**Always use the `mcp__mcp-workspace__*` tools** instead of native `Read`, `Write`, `Edit`, `Glob` and `Grep` for file and git work. Use Bash only for `npm run ...` commands, `git commit/add/push/checkout -b`, `gh` writes with no MCP tool, and anything else with no MCP equivalent.
+**Always use the `mcp__mcp-workspace__*` tools** instead of native `Read`, `Write`, `Edit`, `Glob` and `Grep` for file, git and GitHub work, writes included. Use Bash only for `npm run ...` commands, `gh` writes with no MCP tool (editing a PR), and anything else with no MCP equivalent.
+
+**Protected files** (`.mcp*.json`, `.claude/settings*.json`, `.mcp-file-access`): `.mcp-file-access` makes MCP refuse writes to them by design. Stop and ask the user to edit the file. A refusal is not a gap, so never fall back to native Edit, Bash or PowerShell.
 
 **Justify Bash.** Before a Bash command, say in chat, on two lines:
 
 - _What it does_ — one sentence.
 - _Why MCP doesn't_ — which tool you would have used, and what stops it.
 
-If you can't name the gap, use the MCP tool. Exempt: the approved `npm run` check commands and `git add/commit/push` for the standing commit-and-push workflow. Subagents follow the same rule.
+If you can't name the gap, use the MCP tool. Exempt: the approved `npm run` check commands. Subagents follow the same rule.
 
 Put the same two lines at the top of the call itself, in the Bash `description`, so they show where the command is approved. Keep Bash to a minimum: batch the steps into one scripted call, and read logs and output files with `read_file` or `search_files`, or the native `Read` and `Grep` outside the project, never with shell `cat` or `grep`. Do not ask in chat before a Bash call. The permission prompt is the one approval, and the `description` is the reasoning the user reads there.
 
-**Scratch files.** MCP tools can't write outside the project, so the session scratchpad is out of reach for them. Temporary files go in `.scratch/`. It is not gitignored, because the MCP file tools refuse ignored paths, so delete it before committing. Exception: a file that must live outside the repo (the probes of the API spike, issue #3) goes in the session scratchpad. So does reading a file outside the project, such as the engine's type declarations. Use the native `Read`, `Write`, `Edit` and `Grep` for those, with Bash to run them, and justify each use like a Bash call.
+**Scratch files.** MCP tools can't write outside the project, so the session scratchpad is out of reach for them. Temporary files go in `.scratch/`. It is gitignored; the `read-write /.scratch/` rule in `.mcp-file-access` keeps it writable for the MCP file tools. Delete it when done. Exception: a file that must live outside the repo (the probes of the API spike, issue #3) goes in the session scratchpad. So does reading a file outside the project, such as the engine's type declarations. Use the native `Read`, `Write`, `Edit` and `Grep` for those, with Bash to run them, and justify each use like a Bash call.
 
 | Task                            | MCP tool                                                                                              |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -25,13 +27,21 @@ Put the same two lines at the top of the call itself, in the Bash `description`,
 | Delete, move                    | `delete_this_file`, `delete_directory`, `move_file`                                                   |
 | List, search                    | `list_directory`, `search_files`                                                                      |
 | Git read-only                   | `git` (status, diff, log, show, fetch, branch list)                                                   |
+| Git write                       | `git_branch`, `git_branch_delete`, `git_commit`, `git_push`, `git_push_force`                         |
 | GitHub read-only                | `github_issue_view`, `github_issue_list`, `github_pr_view`, `github_search`                           |
+| GitHub write                    | `github_issue_create`, `github_issue_edit`, `github_issue_comment`, `github_pr_create`                |
 | Branch status, size checks      | `check_branch_status`, `get_base_branch`, `check_file_size`                                           |
 | Reference projects              | `get_reference_projects`, `read_reference_file`, `list_reference_directory`, `search_reference_files` |
 
 **Reference project:** `mcp-coder` (local clone at `~/Documents/GitHub/mcp_coder`). It is the model for the skills, agents and launcher scripts copied into this repo. Check it before asking how something is done there. `mcp-tools-py` (`~/Documents/GitHub/mcp-tools-py`) is the model for the code-quality MCP tools.
 
-**Skills and agents** in `.claude/skills` and `.claude/agents` are copied from mcp-coder. The Python tools (`mcp-tools-py`) are replaced by the matching `npm run` scripts: format → `npm run format`, pylint and ruff → `npm run lint`, mypy → `npm run typecheck`, pytest → `npm run test`, vulture → `npm run deadcode`, import-linter → `npm run arch`. The sleep tool is dropped; the skills no longer wait. They still assume mcp-coder's `mcp-coder gh-tool` for issue status and `.claude/knowledge_base/*.md`, which this repo does not have. The three agents run with `bypassPermissions`. Review them before relying on them here.
+**`git_commit`:** always pass `paths`, never `all=True`, which commits every untracked file that is not gitignored.
+
+**Skills, agents and knowledge base** in `.claude/skills`, `.claude/agents` and `.claude/knowledge_base` are deployed by `mcp-coder init --just-skills` and then adapted: the Python tools (`mcp-tools-py`) are replaced by the matching `npm run` scripts (format → `npm run format`, pylint and ruff → `npm run lint`, mypy → `npm run typecheck`, pytest → `npm run test`, vulture → `npm run deadcode`, import-linter → `npm run arch`), and `python.md` is dropped. A refresh redeploys them and re-applies those adaptations (wiki: `Processes/Chore Implementation`, step 3).
+
+**Privileged agents:** `commit-pusher`, `issue-updater` and `issue-approver` carry a frontmatter `PreToolUse` hook that allows their extra tools without a prompt (`git_commit` and `git_push`, `github_issue_edit`, `github_issue_set_status`). No `bypassPermissions`. Frontmatter hooks are skipped in untrusted folders and under `-p`, where those tools prompt or are denied.
+
+**Chores** are collected in the chore list issue #40 and worked through per the wiki's `Processes/Chore Implementation`.
 
 Ask questions as plain text in the chat, not with a question tool. Tell me at once if the MCP tools are not available.
 
