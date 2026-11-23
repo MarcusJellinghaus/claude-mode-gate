@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `check:catch`, `check:manifests` and `check:docs` export their checks as pure functions and have unit tests, including the cases that must fail.
 - `npm run check` runs the gates with `scripts/check.mjs` instead of `run-s`: one line per gate, and only the failing gate's last 60 lines, without colour codes. `npm-run-all2` is gone.
 - `npm run format` lists only the files it changed. `.claude/settings.json` follows mcp-coder's allow list (MCP file, read and Obsidian tools, WebFetch, skills); `npm run test:mutation`, `npm ci` and Bash git writes now ask. `.mcp-file-access` also protects the platform MCP configs and exposes the engine types and `node_modules` read-only. `CLAUDE.md` has a full tool mapping.
 - The agents that need Bash (`commit-pusher`, `code-engineer`, `issue-analyst`, `plan-engineer`) carry a `PreToolUse` hook, `scripts/agent-bash-guard.mjs`, that denies any Bash call other than their named `npm run` scripts. An agent's `tools:` list cannot restrict Bash by command.
