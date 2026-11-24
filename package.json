@@ -13,7 +13,7 @@
     "typecheck": "node scripts/lay-types.mjs && tsc --noEmit",
     "lint": "eslint .",
     "format:check": "prettier --check .",
-    "format": "prettier --write .",
+    "format": "prettier --write --list-different .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -26,7 +26,7 @@
     "check:pins": "node scripts/check-action-pins.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "audit": "node scripts/audit-gate.mjs",
-    "check": "run-s typecheck lint format:check arch deadcode docs:lint check:manifests check:catch check:pins check:docs test:coverage"
+    "check": "node scripts/check.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -38,7 +38,6 @@
     "eslint": "^10.15.0",
     "knip": "^6.46.1",
     "markdownlint-cli2": "^0.24.2",
-    "npm-run-all2": "^9.0.4",
     "prettier": "^3.10.1",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.73.0",

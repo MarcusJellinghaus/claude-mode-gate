@@ -1,0 +1,35 @@
+# mcp-coder workflow config for this npm repo (mcp-coder docs: configuration/toolkits.md, setup.md).
+# Tests report by exit code: vitest writes no JUnit report here.
+
+# types:lay needs Claude Code on the PATH; without the engine types typecheck cannot pass.
+[tool.mcp-coder.setup]
+steps = [ { name = "deps", argv = ["npm", "ci"] },
+          { name = "types", argv = ["npm", "run", "types:lay"] } ]
+
+[tool.mcp-coder.toolkit]
+toolkit = "command"
+
+[tool.mcp-coder.toolkit.command]
+llm_permissions = "bash"
+parser = "exit-code"
+exit_codes = { 0 = "ok", 1 = "findings" }
+
+[tool.mcp-coder.toolkit.command.format]
+apply = [ { argv = ["npm", "run", "format"] } ]
+check = [ { argv = ["npm", "run", "format:check"] } ]
+
+# tsc exits 2 on type errors, and `npm run check` passes the failing gate's code on.
+# Lint keeps the default: ESLint's 2 is a crash, not findings.
+[tool.mcp-coder.toolkit.command.check]
+quick    = [ { argv = ["npm", "run", "typecheck"], exit_codes = { 0 = "ok", 1 = "findings", 2 = "findings" } },
+             { argv = ["npm", "run", "lint"] } ]
+standard = [ { argv = ["npm", "run", "check"], exit_codes = { 0 = "ok", 1 = "findings", 2 = "findings" } } ]
+full     = [ { argv = ["npm", "run", "check"], exit_codes = { 0 = "ok", 1 = "findings", 2 = "findings" } },
+             { argv = ["npm", "run", "audit"] } ]
+
+[tool.mcp-coder.toolkit.command.test]
+quick      = [ { argv = ["npm", "run", "test"] } ]
+standard   = [ { argv = ["npm", "run", "test"] } ]
+full       = [ { argv = ["npm", "run", "test:coverage"] } ]
+unattended = [ { argv = ["npm", "run", "test"] } ]
+mutation   = [ { argv = ["npm", "run", "test:mutation"], timeout = 3600 } ]

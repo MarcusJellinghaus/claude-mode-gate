@@ -7,6 +7,8 @@
     "MD041": false,
   },
   "globs": ["**/*.md"],
+  // Skip gitignored files, such as the .scratch/ drafts of LLM sessions.
+  "gitignore": true,
   "ignores": [
     ".claude/skills/**",
     ".claude/agents/**",
@@ -14,5 +16,7 @@
     "coverage/**",
     ".stryker-tmp/**",
     "reports/**",
+    // mcp-coder's plan files, written by the LLM during implement.
+    "pr_info/**",
   ],
 }
