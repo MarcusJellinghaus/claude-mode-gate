@@ -27,9 +27,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 See [step_1.md](./steps/step_1.md).
 
-- [ ] Implementation: update `tests/check.test.ts` (failing tests first), then sum `seconds` in `runGates` in `scripts/check.mjs` and add the CHANGELOG line
-- [ ] Quality checks: `npm run format`, then `npm run check` — fix all issues
-- [ ] Commit message prepared: `feat: show the total time on the success line of npm run check`
+- [x] Implementation: update `tests/check.test.ts` (failing tests first), then sum `seconds` in `runGates` in `scripts/check.mjs` and add the CHANGELOG line
+- [x] Quality checks: `npm run format`, then `npm run check` — fix all issues
+- [x] Commit message prepared: `feat: show the total time on the success line of npm run check`
 
 ## Pull Request
 
