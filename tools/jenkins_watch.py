@@ -12,22 +12,27 @@ logic lives in ``mcp_coder.utils.jenkins_operations``, so run it with a Python
 that has mcp-coder installed (the launcher's tool env); the script itself uses
 only the standard library besides that.
 
-Exit codes:
-    0  idle: no build ran for --idle minutes
-    1  problem: a build ended failure, unstable or aborted
-    2  stalled: a running build's log did not grow for --stall minutes
-    3  Jenkins could not be read, or it is not configured
-    4  heartbeat: a build still runs (and its log grows) after --report minutes
+The last line is the result:
+    RESULT: idle           no build ran for --idle minutes
+    RESULT: problem        a build ended failure, unstable or aborted
+    RESULT: stalled        a running build's log did not grow for --stall minutes
+    RESULT: heartbeat      a build still runs (and its log grows) after --report minutes
+    RESULT: jenkins-error  Jenkins failed several polls in a row
+
+Exit codes: 0 for every result above except jenkins-error, which exits 3 like
+any other Jenkins or configuration failure; 2 for bad arguments.
 
 The scan covers the mcp-coder command's output, between the Executor's
 "command execution ===" and "archive after execution ===" lines, and prints
-that line range so a reader can open just that part of the saved log.
+that line range so a reader can open just that part of the saved log. It also
+prints the last label change it finds there.
 
 Usage:
     python tools/jenkins_watch.py [--issue N [--repo NAME]] [--job PATH]
         [--interval SECONDS] [--idle MINUTES] [--stall MINUTES] [--report MINUTES]
         [--watch-only]
-    python tools/jenkins_watch.py --inspect BUILD_NUMBER [--job PATH]
+    python tools/jenkins_watch.py --list [--issue N [--repo NAME]] [--job PATH]
+    python tools/jenkins_watch.py --inspect BUILD_NUMBER... [--job PATH]
 """
 
 import argparse
@@ -45,6 +50,8 @@ from mcp_coder.utils.user_config import load_config
 
 PROBLEM_STATUSES = frozenset({"failure", "unstable", "aborted"})
 MAX_PRINTED_MATCHES = 25
+# Warnings can be long and are rarely the cause; errors and decisions print in full.
+MAX_WARNING_WIDTH = 200
 MAX_JENKINS_ERRORS = 3
 # Jenkins' Text Finder plugin quotes the patterns it searched for, " - ERROR - " included.
 IGNORED_PREFIX = "[Text Finder]"
@@ -55,19 +62,26 @@ SECTION_END = re.compile(r"^archive after execution\s+=+\s*$")
 # Executor display name: "<repo> - #<issue> - <step> - #<build>".
 BUILD_NAME = re.compile(r" - #(?P<issue>\d+) - (?P<step>.+) - #\d+$")
 
+# Label changes: mcp-coder's label_transitions, and its set-status command.
+LABEL_CHANGE = re.compile(
+    r"Successfully updated issue #\d+ label: (?P<change>.+)$|Updated issue #\d+ to (?P<status>\S+)"
+)
+
+# Checked in this order, first match wins: decisions before warnings, because the
+# review handoff logs its banner and its reason at WARNING level.
 LOG_PATTERNS = (
     (
         "error",
         re.compile(r" - (ERROR|CRITICAL) - |^ERROR:|Traceback \(most recent call last\)"),
     ),
-    ("warning", re.compile(r" - WARNING - ")),
     (
         "decision",
         re.compile(
-            r"Blocked marker found:|REVIEW HANDED OFF|Successfully updated issue #\d+ label:"
-            r"|Skipped set-status|Workflow failed|^Finished: "
+            r"Blocked marker found:|REVIEW HANDED OFF| - Reason: |Successfully updated issue #\d+ label:"
+            r"|Updated issue #\d+ to |Skipped set-status|Workflow failed|^Finished: "
         ),
     ),
+    ("warning", re.compile(r" - WARNING - ")),
 )
 
 
@@ -194,6 +208,23 @@ def scan_log(log: str, first: int = 1, last: int | None = None) -> list[LogMatch
     return matches
 
 
+def label_change(matches: list[LogMatch]) -> str | None:
+    """Return the last label change among the scan's matches.
+
+    Args:
+        matches: Result of scan_log
+
+    Returns:
+        E.g. "status-06:implementing → status-07:code-review", or the new label
+        alone for set-status; None when the label did not change
+    """
+    for match in reversed(matches):
+        found = LABEL_CHANGE.search(match.text)
+        if found:
+            return found["change"] or found["status"]
+    return None
+
+
 def say(message: str) -> None:
     """Print a timestamped line; flushed so a background run's output file stays current."""
     print(f"[{datetime.now():%H:%M:%S}] {message}", flush=True)
@@ -204,6 +235,13 @@ def describe(build: BuildInfo) -> str:
     return f"{build.status:<8} #{build.number}  {build.display_name}"
 
 
+def list_line(build: BuildInfo) -> str:
+    """Return a build's line for --list: start time, duration, summary."""
+    started = build.timestamp.astimezone()
+    duration = f"{build.duration_ms / 60_000:.0f} min" if build.duration_ms else ""
+    return f"{started:%Y-%m-%d %H:%M}  {duration:>7}  {describe(build)}"
+
+
 def inspect_log(
     client: JenkinsClient,
     job_path: str,
@@ -211,7 +249,7 @@ def inspect_log(
     log_dir: Path,
     display_name: str = "",
     saved_at: datetime | None = None,
-) -> None:
+) -> bool:
     """Save a build's console log (so far, if it still runs) and print what the scan found.
 
     Args:
@@ -221,6 +259,9 @@ def inspect_log(
         log_dir: Directory for the log file
         display_name: Jenkins displayName, for the file name
         saved_at: Save time for the file name; None for now
+
+    Returns:
+        False if the log could not be downloaded or saved
     """
     target = log_dir / log_filename(number, display_name, saved_at or datetime.now())
     try:
@@ -230,7 +271,7 @@ def inspect_log(
         target.write_text(text, encoding="utf-8", newline="")
     except (JenkinsError, OSError) as e:
         print(f"  log download failed: {e}", flush=True)
-        return
+        return False
     section = command_section(text)
     if section is None:
         where = "no command section, whole log scanned"
@@ -242,11 +283,16 @@ def inspect_log(
         f"{kind} {sum(m.kind == kind for m in matches)}" for kind, _ in LOG_PATTERNS
     )
     print(f"  log: {target} ({len(text.splitlines())} lines; {where}; {counts})")
+    label = label_change(matches)
+    if label:
+        print(f"  label: {label}")
     for match in matches[:MAX_PRINTED_MATCHES]:
-        print(f"  {match.line_number:>6}: {match.text[:200]}")
+        shown = match.text[:MAX_WARNING_WIDTH] if match.kind == "warning" else match.text
+        print(f"  {match.line_number:>6}: {shown}")
     if len(matches) > MAX_PRINTED_MATCHES:
         print(f"  ... {len(matches) - MAX_PRINTED_MATCHES} more, see the log file")
     sys.stdout.flush()
+    return True
 
 
 def watch(
@@ -254,7 +300,7 @@ def watch(
     options: Options,
     sleep: Callable[[float], None] = time.sleep,
     now: Callable[[], float] = time.monotonic,
-) -> int:
+) -> str:
     """Poll until a build ends badly, nothing runs for a while, or time runs out.
 
     Args:
@@ -264,7 +310,7 @@ def watch(
         now: Monotonic clock in seconds, replaced in tests
 
     Returns:
-        Exit code, see the module docstring
+        The result, also printed as the last line; see the module docstring
 
     Raises:
         JenkinsError: If the first listing fails
@@ -280,6 +326,10 @@ def watch(
 
     def inspect(build: BuildInfo) -> None:
         inspect_log(client, build.job_path, build.number, options.log_dir, build.display_name)
+
+    def result(name: str, detail: str = "") -> str:
+        say(f"RESULT: {name}{detail}")
+        return name
 
     # Per running build: log length at the last poll, and when it last grew.
     log_growth: dict[tuple[str, int], tuple[int, float]] = {}
@@ -305,8 +355,7 @@ def watch(
         say(f"newest {describe(newest)}")
         if newest.status in PROBLEM_STATUSES:
             inspect(newest)
-            say("RESULT: problem")
-            return 1
+            return result("problem")
     target = options.pattern.pattern if options.pattern else "all builds"
     say(f"watching {target} in {options.job or 'the whole server'}; {len(previous)} builds known")
 
@@ -317,12 +366,9 @@ def watch(
                 for build in running(previous):
                     say(f"still {describe(build)}")
                     inspect(build)
-                say("RESULT: heartbeat")
-                return 4
+                return result("heartbeat")
         if now() - last_active >= options.idle * 60:
-            newest = f"; newest {describe(previous[0])}" if previous else ""
-            say(f"RESULT: idle{newest}")
-            return 0
+            return result("idle", f"; newest {describe(previous[0])}" if previous else "")
 
         sleep(options.interval)
         try:
@@ -333,8 +379,7 @@ def watch(
             say(f"Jenkins error: {e}")
             jenkins_errors += 1
             if jenkins_errors >= MAX_JENKINS_ERRORS:
-                say("RESULT: jenkins-error")
-                return 3
+                return result("jenkins-error")
             continue
 
         changed = changed_builds(previous, current)
@@ -344,13 +389,11 @@ def watch(
                 inspect(build)
         previous = current
         if any(b.status in PROBLEM_STATUSES for b in changed):
-            say("RESULT: problem")
-            return 1
+            return result("problem")
         if stalled is not None:
             say(f"no new log output for {options.stall:g} min: {describe(stalled)}")
             inspect(stalled)
-            say("RESULT: stalled")
-            return 2
+            return result("stalled")
 
 
 def build_name(client: JenkinsClient, job: str, number: int) -> str:
@@ -438,7 +481,16 @@ def main(argv: list[str] | None = None) -> int:
         "--log-dir", type=Path, default=Path(".scratch"), help="(default: .scratch)"
     )
     parser.add_argument(
-        "--inspect", type=int, metavar="N", help="only save and scan build N's log, then exit"
+        "--list",
+        action="store_true",
+        help="only list the newest --limit builds (of --issue), oldest first, then exit",
+    )
+    parser.add_argument(
+        "--inspect",
+        type=int,
+        nargs="+",
+        metavar="N",
+        help="only save and scan these builds' logs, then exit",
     )
     parser.add_argument(
         "--watch-only",
@@ -452,15 +504,29 @@ def main(argv: list[str] | None = None) -> int:
     if args.inspect is not None and job is None:
         parser.error("--inspect needs --job (no single executor job configured)")
 
+    pattern = issue_pattern(args.issue, args.repo) if args.issue is not None else None
+
     client = make_client()
     if client is None:
         return 3
     if args.inspect is not None:
-        inspect_log(client, job, args.inspect, args.log_dir, build_name(client, job, args.inspect))
+        saved = [
+            inspect_log(client, job, number, args.log_dir, build_name(client, job, number))
+            for number in args.inspect
+        ]
+        return 0 if all(saved) else 3
+    if args.list:
+        try:
+            builds = client.get_recent_builds(limit=args.limit, path=job, name_pattern=pattern)
+        except JenkinsError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 3
+        for build in reversed(builds):
+            print(list_line(build))
         return 0
     options = Options(
         job=job,
-        pattern=issue_pattern(args.issue, args.repo) if args.issue is not None else None,
+        pattern=pattern,
         limit=args.limit,
         interval=args.interval,
         idle=args.idle,
@@ -470,7 +536,7 @@ def main(argv: list[str] | None = None) -> int:
         watch_only=args.watch_only,
     )
     try:
-        return watch(client, options)
+        return 3 if watch(client, options) == "jenkins-error" else 0
     except JenkinsError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 3

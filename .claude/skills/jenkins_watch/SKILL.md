@@ -33,22 +33,22 @@ Follows mcp-coder's automated workflow on Jenkins (create-plan, review-plan, imp
 
    It first checks the current state: it prints the running builds, else the newest build, and if that one ended badly it exits at once with `problem` and the log scan. Only if nothing needs a look does it wait. Right after a retry, add `--watch-only`: the old failure is still the newest build until the coordinator starts the new one.
 
-   Defaults: poll every 120 s, `--idle 20` min, `--stall 60` min, `--report 120` min. A running build is fine as long as its console log grows; long implementations (two hours and more) are normal. It prints each new build and status change; for each finished build it saves the log to `.scratch/jenkins_log_<issue>_<step>_<build>_<date>_<time>.txt` and prints the scan: the command section's line range (between `command execution ===` and `archive after execution ===`), counts of errors, warnings and deciding lines, and the first 25 matches with line numbers.
+   Defaults: poll every 120 s, `--idle 20` min, `--stall 60` min, `--report 120` min. A running build is fine as long as its console log grows; long implementations (two hours and more) are normal. It prints each new build and status change; for each finished build it saves the log to `.scratch/jenkins_log_<issue>_<step>_<build>_<date>_<time>.txt` and prints the scan: the command section's line range (between `command execution ===` and `archive after execution ===`), counts of errors, deciding lines and warnings, the last label change (`label: status-17i:code-reviewing → status-07:code-review`), and the first 25 matches with line numbers. Errors and deciding lines (`Error:`, the handoff `Reason:`) are printed in full, warnings cut at 200 characters.
 
-2. **Read the watcher's output** (the output file named in the completion notice) and act on the `RESULT:` line:
+2. **Read the watcher's output** (the output file named in the completion notice) and act on the `RESULT:` line. The exit code is 0 for all of them except `jenkins-error` (3); 2 means bad arguments.
 
-   | Exit | `RESULT:` | Action |
-   |---|---|---|
-   | 0 | `idle` | `github_issue_view` the issue. Label a bot picks up (`02`, `05`, `08`, `14`, `17`) without `blocked` / `wait` → restart the watcher (step 1). Human-action label (`04`, `07`, `10`, ...) or closed → report: done, or what you need to do next |
-   | 1 | `problem` | Analyse (step 3). For `unstable`: if the label moved on as expected, it was a warning only → mention it and restart the watcher |
-   | 2 | `stalled` | A running build wrote no log output for `--stall` minutes. The scan of its log so far is in the output → analyse (step 3), then report |
-   | 3 | `jenkins-error` | Report. Suggest `mcp-coder verify` (JENKINS sections) |
-   | 4 | `heartbeat` | Still running, log still growing. Tell the user in one or two lines (step, how long, anything the scan flagged), then restart with `--watch-only` |
+   | `RESULT:` | Action |
+   |---|---|
+   | `idle` | `github_issue_view` the issue. Label a bot picks up (`02`, `05`, `08`, `14`, `17`) without `blocked` / `wait` → restart the watcher (step 1). Human-action label (`04`, `07`, `10`, ...) or closed → report: done, or what you need to do next |
+   | `problem` | Analyse (step 3). For `unstable`: if the `label:` line shows the label moved on as expected, it was a warning only → mention it and restart the watcher |
+   | `stalled` | A running build wrote no log output for `--stall` minutes. The scan of its log so far is in the output → analyse (step 3), then report |
+   | `jenkins-error` | Report. Suggest `mcp-coder verify` (JENKINS sections) |
+   | `heartbeat` | Still running, log still growing. Tell the user in one or two lines (step, how long, anything the scan flagged), then restart with `--watch-only` |
 
 3. **Analyse a problem.**
    - Read the failure comment on the issue first (`github_issue_view` with comments: Category / Stage / Error). It often settles the cause.
    - Otherwise start a subagent (`general-purpose`) to read the log. Give it the log path, the command-section line range and the matches the watcher printed, and ask for: the cause in two or three sentences, with the deciding log lines quoted by line number; whether it is transient or needs a fix; the fix. Tell it to read only the command section with `read_file(start_line, end_line)`, and more only if the section does not explain the failure.
-   - More logs: `python tools/jenkins_watch.py --inspect <build number>` saves and scans one build, also a running one (its log so far).
+   - More logs: `python tools/jenkins_watch.py --list --issue <N> --repo <repo>` lists the issue's builds (start, duration, status, number, step), oldest first. `--inspect <build> [<build> ...]` saves and scans those builds, also a running one (its log so far).
 
 4. **Report** to the user: issue, build, step, result, cause, and a proposal: the fix, then the retry label from `failure-handling.md` (set with `github_issue_set_status` only after approval). After the fix and retry, offer to restart the watcher with `--watch-only`.
 
