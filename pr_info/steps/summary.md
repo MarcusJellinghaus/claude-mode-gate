@@ -22,11 +22,11 @@ None at the module level. The change stays inside `runGates`:
 
 ## Files modified
 
-| File                  | Change                                                                                     |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| `scripts/check.mjs`   | `runGates` sums `seconds` and prints the total on the success line                         |
-| `tests/check.test.ts` | Helper accepts an optional per-gate `seconds`; success test updated; one new test          |
-| `CHANGELOG.md`        | One line under `## Unreleased`                                                             |
+| File                  | Change                                                                            |
+| --------------------- | --------------------------------------------------------------------------------- |
+| `scripts/check.mjs`   | `runGates` sums `seconds` and prints the total on the success line                |
+| `tests/check.test.ts` | Helper accepts an optional per-gate `seconds`; success test updated; one new test |
+| `CHANGELOG.md`        | One line under `## Unreleased`                                                    |
 
 No files or folders are created besides these plan files.
 
