@@ -1,6 +1,7 @@
 # review-implementation review log 1
 
 ## Round 1 — 2026-11-26
+
 **Findings**:
 .mcp-coder/create_plan_sessions/response_2026-11-26T18-07-58.json:1 — medium — Commit a11d36d committed three mcp-coder session logs (`response_2026-11-26T18-07-58.json`, `…T18-08-13.json`, `…T18-08-55.json`, about 2,200 lines). Commit e050189 added `/.mcp-coder/*` to `.gitignore` later, but that does not untrack files already committed. Remove them from the branch before the PR.
 tools/jenkins_watch.py:1 — medium — Commits 244d95d, f827fa2, cc81fce and 0adcc9f put the unrelated `/jenkins_watch` feature on the #43 branch: `tools/jenkins_watch.py`, `tests/tools/test_jenkins_watch.py`, `SKILL.md`, entries in `.claude/settings.json` and `.claude/CLAUDE.md`, and a CHANGELOG bullet. None of it is in #43 or its plan, so it is out of scope. Move it to its own issue or PR, or list it explicitly in the PR description.
