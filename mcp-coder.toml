@@ -1,5 +1,4 @@
 # mcp-coder workflow config for this npm repo (mcp-coder docs: configuration/toolkits.md, setup.md).
-# Tests report by exit code: vitest writes no JUnit report here.
 
 # types:lay needs Claude Code on the PATH; without the engine types typecheck cannot pass.
 [tool.mcp-coder.setup]
@@ -9,27 +8,31 @@ steps = [ { name = "deps", argv = ["npm", "ci"] },
 [tool.mcp-coder.toolkit]
 toolkit = "command"
 
-[tool.mcp-coder.toolkit.command]
-llm_permissions = "bash"
-parser = "exit-code"
-exit_codes = { 0 = "ok", 1 = "findings" }
-
+# Declare only the depths the default bindings request: `mcp-coder verify` warns about any other.
 [tool.mcp-coder.toolkit.command.format]
 apply = [ { argv = ["npm", "run", "format"] } ]
-check = [ { argv = ["npm", "run", "format:check"] } ]
 
-# tsc exits 2 on type errors, and `npm run check` passes the failing gate's code on.
-# Lint keeps the default: ESLint's 2 is a crash, not findings.
+# The gates of `npm run check` (scripts/check.mjs) as separate steps, so each failure is
+# its own finding. Left out: format:check (mcp-coder formats before every commit) and
+# test:coverage (the test action runs it). npm passes a script's exit code on unchanged:
+# tsc exits 1 or 2 on type errors, depcruise exits with its violation count. The default
+# { 0 = "ok", 1 = "findings" } fits the rest; ESLint and knip use 2 for a crash.
 [tool.mcp-coder.toolkit.command.check]
-quick    = [ { argv = ["npm", "run", "typecheck"], exit_codes = { 0 = "ok", 1 = "findings", 2 = "findings" } },
+quick    = [ { argv = ["npm", "run", "typecheck"], exit_codes = { 0 = "ok", 1-2 = "findings" } },
              { argv = ["npm", "run", "lint"] } ]
-standard = [ { argv = ["npm", "run", "check"], exit_codes = { 0 = "ok", 1 = "findings", 2 = "findings" } } ]
-full     = [ { argv = ["npm", "run", "check"], exit_codes = { 0 = "ok", 1 = "findings", 2 = "findings" } },
-             { argv = ["npm", "run", "audit"] } ]
+standard = [ { argv = ["npm", "run", "typecheck"], exit_codes = { 0 = "ok", 1-2 = "findings" } },
+             { argv = ["npm", "run", "lint"] },
+             { argv = ["npm", "run", "arch"], exit_codes = { 0 = "ok", 1-125 = "findings" } },
+             { argv = ["npm", "run", "deadcode"] },
+             { argv = ["npm", "run", "docs:lint"] },
+             { argv = ["npm", "run", "check:manifests"] },
+             { argv = ["npm", "run", "check:catch"] },
+             { argv = ["npm", "run", "check:pins"] },
+             { argv = ["npm", "run", "check:docs"] } ]
 
+# test:coverage is the gate CI and `npm run check` use. Tests report by exit code:
+# vitest writes no JUnit report here.
 [tool.mcp-coder.toolkit.command.test]
-quick      = [ { argv = ["npm", "run", "test"] } ]
-standard   = [ { argv = ["npm", "run", "test"] } ]
-full       = [ { argv = ["npm", "run", "test:coverage"] } ]
-unattended = [ { argv = ["npm", "run", "test"] } ]
-mutation   = [ { argv = ["npm", "run", "test:mutation"], timeout = 3600 } ]
+quick      = [ { argv = ["npm", "run", "test:coverage"] } ]
+standard   = [ { argv = ["npm", "run", "test:coverage"] } ]
+unattended = [ { argv = ["npm", "run", "test:coverage"] } ]
