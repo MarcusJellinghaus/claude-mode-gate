@@ -52,6 +52,8 @@ IGNORED_PREFIX = "[Text Finder]"
 # echoed script source ("echo command execution ...") does not match.
 SECTION_START = re.compile(r"^command execution\s+=+\s*$")
 SECTION_END = re.compile(r"^archive after execution\s+=+\s*$")
+# Executor display name: "<repo> - #<issue> - <step> - #<build>".
+BUILD_NAME = re.compile(r" - #(?P<issue>\d+) - (?P<step>.+) - #\d+$")
 
 LOG_PATTERNS = (
     (
@@ -125,6 +127,28 @@ def changed_builds(previous: list[BuildInfo], current: list[BuildInfo]) -> list[
     return [b for b in current if status_before.get((b.job_path, b.number)) != b.status]
 
 
+def log_filename(number: int, display_name: str, saved_at: datetime) -> str:
+    """Return the file name for a saved console log.
+
+    The save time keeps a running build's earlier snapshots.
+
+    Args:
+        number: Build number
+        display_name: Jenkins displayName; issue and step are taken from it
+        saved_at: When the log is saved
+
+    Returns:
+        E.g. "jenkins_log_43_implement_3174_2026-11-26_19-04-08.txt", or
+        "jenkins_log_3174_<time>.txt" for a build without an Executor name
+    """
+    match = BUILD_NAME.search(display_name)
+    issue_step = ""
+    if match:
+        step = re.sub(r"[^\w-]", "_", match["step"])
+        issue_step = f"{match['issue']}_{step}_"
+    return f"jenkins_log_{issue_step}{number}_{saved_at:%Y-%m-%d_%H-%M-%S}.txt"
+
+
 def command_section(log: str) -> tuple[int, int] | None:
     """Return the lines of the mcp-coder command's output in an Executor log.
 
@@ -180,7 +204,14 @@ def describe(build: BuildInfo) -> str:
     return f"{build.status:<8} #{build.number}  {build.display_name}"
 
 
-def inspect_log(client: JenkinsClient, job_path: str, number: int, log_dir: Path) -> None:
+def inspect_log(
+    client: JenkinsClient,
+    job_path: str,
+    number: int,
+    log_dir: Path,
+    display_name: str = "",
+    saved_at: datetime | None = None,
+) -> None:
     """Save a build's console log (so far, if it still runs) and print what the scan found.
 
     Args:
@@ -188,8 +219,10 @@ def inspect_log(client: JenkinsClient, job_path: str, number: int, log_dir: Path
         job_path: Full job path, e.g. "Windows-Agents/Executor"
         number: Build number
         log_dir: Directory for the log file
+        display_name: Jenkins displayName, for the file name
+        saved_at: Save time for the file name; None for now
     """
-    target = log_dir / f"{job_path.rsplit('/', 1)[-1]}_{number}.txt"
+    target = log_dir / log_filename(number, display_name, saved_at or datetime.now())
     try:
         text = client.get_console_output(job_path, number)
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -245,6 +278,9 @@ def watch(
     def running(builds: list[BuildInfo]) -> list[BuildInfo]:
         return [b for b in builds if b.status == "running"]
 
+    def inspect(build: BuildInfo) -> None:
+        inspect_log(client, build.job_path, build.number, options.log_dir, build.display_name)
+
     # Per running build: log length at the last poll, and when it last grew.
     log_growth: dict[tuple[str, int], tuple[int, float]] = {}
 
@@ -268,7 +304,7 @@ def watch(
         newest = previous[0]
         say(f"newest {describe(newest)}")
         if newest.status in PROBLEM_STATUSES:
-            inspect_log(client, newest.job_path, newest.number, options.log_dir)
+            inspect(newest)
             say("RESULT: problem")
             return 1
     target = options.pattern.pattern if options.pattern else "all builds"
@@ -280,7 +316,7 @@ def watch(
             if now() - start >= options.report * 60:
                 for build in running(previous):
                     say(f"still {describe(build)}")
-                    inspect_log(client, build.job_path, build.number, options.log_dir)
+                    inspect(build)
                 say("RESULT: heartbeat")
                 return 4
         if now() - last_active >= options.idle * 60:
@@ -305,16 +341,35 @@ def watch(
         for build in changed:
             say(describe(build))
             if build.status != "running":
-                inspect_log(client, build.job_path, build.number, options.log_dir)
+                inspect(build)
         previous = current
         if any(b.status in PROBLEM_STATUSES for b in changed):
             say("RESULT: problem")
             return 1
         if stalled is not None:
             say(f"no new log output for {options.stall:g} min: {describe(stalled)}")
-            inspect_log(client, stalled.job_path, stalled.number, options.log_dir)
+            inspect(stalled)
             say("RESULT: stalled")
             return 2
+
+
+def build_name(client: JenkinsClient, job: str, number: int) -> str:
+    """Return a build's display name, or "" when it cannot be found.
+
+    Args:
+        client: Jenkins client
+        job: Full job path
+        number: Build number
+
+    Returns:
+        The display name; "" if the build is not among the newest 100 or Jenkins fails
+    """
+    pattern = re.compile(rf"(^|\D)#{number}$")
+    try:
+        builds = client.get_recent_builds(limit=1, path=job, name_pattern=pattern)
+    except JenkinsError:
+        return ""
+    return builds[0].display_name if builds else ""
 
 
 def configured_executor_job() -> str | None:
@@ -380,7 +435,7 @@ def main(argv: list[str] | None = None) -> int:
         help="minutes after which a still running build is reported (default: 120)",
     )
     parser.add_argument(
-        "--log-dir", type=Path, default=Path(".scratch/jenkins"), help="(default: .scratch/jenkins)"
+        "--log-dir", type=Path, default=Path(".scratch"), help="(default: .scratch)"
     )
     parser.add_argument(
         "--inspect", type=int, metavar="N", help="only save and scan build N's log, then exit"
@@ -401,7 +456,7 @@ def main(argv: list[str] | None = None) -> int:
     if client is None:
         return 3
     if args.inspect is not None:
-        inspect_log(client, job, args.inspect, args.log_dir)
+        inspect_log(client, job, args.inspect, args.log_dir, build_name(client, job, args.inspect))
         return 0
     options = Options(
         job=job,

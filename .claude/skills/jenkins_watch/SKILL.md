@@ -7,7 +7,7 @@ allowed-tools:
   - mcp__mcp-workspace__search_files
   - mcp__mcp-workspace__github_issue_view
   - mcp__mcp-workspace__read_reference_file
-  - mcp__mcp-workspace__delete_directory
+  - mcp__mcp-workspace__delete_this_file
 ---
 
 # Jenkins Watch
@@ -33,7 +33,7 @@ Follows mcp-coder's automated workflow on Jenkins (create-plan, review-plan, imp
 
    It first checks the current state: it prints the running builds, else the newest build, and if that one ended badly it exits at once with `problem` and the log scan. Only if nothing needs a look does it wait. Right after a retry, add `--watch-only`: the old failure is still the newest build until the coordinator starts the new one.
 
-   Defaults: poll every 120 s, `--idle 20` min, `--stall 60` min, `--report 120` min. A running build is fine as long as its console log grows; long implementations (two hours and more) are normal. It prints each new build and status change; for each finished build it saves the log to `.scratch/jenkins/<job>_<n>.txt` and prints the scan: the command section's line range (between `command execution ===` and `archive after execution ===`), counts of errors, warnings and deciding lines, and the first 25 matches with line numbers.
+   Defaults: poll every 120 s, `--idle 20` min, `--stall 60` min, `--report 120` min. A running build is fine as long as its console log grows; long implementations (two hours and more) are normal. It prints each new build and status change; for each finished build it saves the log to `.scratch/jenkins_log_<issue>_<step>_<build>_<date>_<time>.txt` and prints the scan: the command section's line range (between `command execution ===` and `archive after execution ===`), counts of errors, warnings and deciding lines, and the first 25 matches with line numbers.
 
 2. **Read the watcher's output** (the output file named in the completion notice) and act on the `RESULT:` line:
 
@@ -52,4 +52,4 @@ Follows mcp-coder's automated workflow on Jenkins (create-plan, review-plan, imp
 
 4. **Report** to the user: issue, build, step, result, cause, and a proposal: the fix, then the retry label from `failure-handling.md` (set with `github_issue_set_status` only after approval). After the fix and retry, offer to restart the watcher with `--watch-only`.
 
-5. **Clean up** when the watch ends: `delete_directory(".scratch/jenkins", recursive=True)`.
+5. **Clean up** when the watch ends: delete the `.scratch/jenkins_log_*.txt` files (`delete_this_file`).

@@ -40,7 +40,12 @@ EXECUTOR_LOG = "\r\n".join(
 )
 
 
-def build(number: int, status: str, name: str = "repo - #43 - implement") -> BuildInfo:
+SAVED_AT = datetime(2026, 11, 26, 19, 4, 8)
+
+
+def build(number: int, status: str, name: str | None = None) -> BuildInfo:
+    if name is None:
+        name = f"repo - #43 - implement - #{number}"
     return BuildInfo(
         job_path="Windows-Agents/Executor",
         folder="Windows-Agents",
@@ -118,7 +123,8 @@ def test_failed_build_is_a_problem_and_its_log_is_scanned(
     client = client_listing([build(1, "running")], [build(1, "failure")])
     assert run_watch(client, tmp_path) == 1
     client.get_console_output.assert_called_with("Windows-Agents/Executor", 1)
-    assert (tmp_path / "logs" / "Executor_1.txt").read_text(encoding="utf-8") == FAILING_LOG
+    (log_file,) = (tmp_path / "logs").glob("jenkins_log_43_implement_1_*.txt")
+    assert log_file.read_text(encoding="utf-8") == FAILING_LOG
     out = capsys.readouterr().out
     assert "error 1, warning 0, decision 1" in out
     assert "1: 2026-11-26 18:04:00 - ERROR - LLM timed out" in out
@@ -315,8 +321,11 @@ def test_inspect_scans_the_command_section_and_keeps_line_endings(
 ) -> None:
     client = MagicMock()
     client.get_console_output.return_value = EXECUTOR_LOG
-    jenkins_watch.inspect_log(client, "Windows-Agents/Executor", 1, tmp_path)
-    assert (tmp_path / "Executor_1.txt").read_bytes() == EXECUTOR_LOG.encode("utf-8")
+    jenkins_watch.inspect_log(
+        client, "Windows-Agents/Executor", 1, tmp_path, "repo - #43 - implement - #1", SAVED_AT
+    )
+    saved = tmp_path / "jenkins_log_43_implement_1_2026-11-26_19-04-08.txt"
+    assert saved.read_bytes() == EXECUTOR_LOG.encode("utf-8")
     out = capsys.readouterr().out
     assert "command section: lines 6-10" in out
     assert "error 1, warning 0, decision 0" in out
@@ -338,12 +347,44 @@ def test_inspect_option_scans_one_build_and_exits(
 ) -> None:
     client = MagicMock()
     client.get_console_output.return_value = EXECUTOR_LOG
+    client.get_recent_builds.return_value = [build(7, "failure")]
     monkeypatch.setattr(jenkins_watch, "make_client", lambda: client)
     argv = ["--inspect", "7", "--job", "A/Executor", "--log-dir", str(tmp_path)]
     assert jenkins_watch.main(argv) == 0
     client.get_console_output.assert_called_once_with("A/Executor", 7)
-    client.get_recent_builds.assert_not_called()
+    assert list(tmp_path.glob("jenkins_log_43_implement_7_*.txt"))
     assert "command section: lines 6-10" in capsys.readouterr().out
+
+
+def test_inspect_option_without_a_build_name_uses_the_number(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    client = MagicMock()
+    client.get_console_output.return_value = ""
+    client.get_recent_builds.side_effect = JenkinsError("down")
+    monkeypatch.setattr(jenkins_watch, "make_client", lambda: client)
+    argv = ["--inspect", "7", "--job", "A/Executor", "--log-dir", str(tmp_path)]
+    assert jenkins_watch.main(argv) == 0
+    assert list(tmp_path.glob("jenkins_log_7_*.txt"))
+
+
+@pytest.mark.parametrize(
+    ("display_name", "expected"),
+    [
+        (
+            "claude-mode-gate - #43 - implement - #3174",
+            "jenkins_log_43_implement_3174_2026-11-26_19-04-08.txt",
+        ),
+        (
+            "mcp_coder - #1419 - review-plan - #3174",
+            "jenkins_log_1419_review-plan_3174_2026-11-26_19-04-08.txt",
+        ),
+        ("#3174", "jenkins_log_3174_2026-11-26_19-04-08.txt"),
+        ("", "jenkins_log_3174_2026-11-26_19-04-08.txt"),
+    ],
+)
+def test_log_filename(display_name: str, expected: str) -> None:
+    assert jenkins_watch.log_filename(3174, display_name, SAVED_AT) == expected
 
 
 def test_repo_without_issue_exits_2() -> None:
