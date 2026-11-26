@@ -216,12 +216,21 @@ def test_growing_log_is_not_stalled_and_reports_a_heartbeat(
 
 def test_stall_clock_restarts_when_the_log_grows(tmp_path: Path) -> None:
     client = client_listing([build(1, "running")])
-    logs = ["a", "a", "a\nb", "a\nb", "a\nb", "a\nb", "a\nb"]
+    logs = ["a", "a", "a\nb", "a\nb", "a\nb"]
     client.get_console_output.side_effect = lambda *_: logs.pop(0) if len(logs) > 1 else logs[0]
-    # Polls each minute; the log grows at minute 2, so with stall=3 it stalls at
-    # minute 5 (the 6th listing), not at minute 3.
-    assert run_watch(client, tmp_path, stall=3) == "stalled"
-    assert client.get_recent_builds.call_count == 6
+    # Polls each minute, checks the log every 5: at minutes 0, 5, 10 (grown), 15, 20.
+    # With stall=10 it stalls at minute 20 (the 21st listing), not at minute 10.
+    assert run_watch(client, tmp_path, stall=10) == "stalled"
+    assert client.get_recent_builds.call_count == 21
+    assert client.get_console_output.call_count == 6  # five checks, then the report
+
+
+def test_running_build_log_is_only_downloaded_every_few_minutes(tmp_path: Path) -> None:
+    running = [build(1, "running")]
+    client = client_listing(running, running, running, running, [build(1, "success")])
+    assert run_watch(client, tmp_path) == "idle"
+    # The first check at minute 0, then the finished build's report; none in between.
+    assert client.get_console_output.call_count == 2
 
 
 def test_no_heartbeat_while_nothing_runs(tmp_path: Path) -> None:
@@ -229,21 +238,23 @@ def test_no_heartbeat_while_nothing_runs(tmp_path: Path) -> None:
     assert run_watch(client, tmp_path, idle=30, report=10) == "idle"
 
 
-def test_jenkins_errors_in_a_row_end_the_watch(tmp_path: Path) -> None:
+def test_jenkins_errors_for_five_minutes_end_the_watch(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     client = MagicMock()
+    # Polls each minute: errors from minute 1 to minute 6, five minutes apart.
     client.get_recent_builds.side_effect = [[build(1, "running")]] + [
         JenkinsError("down")
-    ] * 3
+    ] * 6
     assert run_watch(client, tmp_path) == "jenkins-error"
+    assert capsys.readouterr().out.count("Jenkins error: down") == 2  # first and last
 
 
-def test_one_jenkins_error_is_retried(tmp_path: Path) -> None:
+def test_shorter_jenkins_outage_is_retried(tmp_path: Path) -> None:
     client = MagicMock()
-    client.get_recent_builds.side_effect = [
-        [build(1, "running")],
-        JenkinsError("blip"),
-        [build(1, "failure")],
-    ]
+    client.get_recent_builds.side_effect = [[build(1, "running")]] + [
+        JenkinsError("blip")
+    ] * 5 + [[build(1, "failure")]]
     client.get_console_output.return_value = ""
     assert run_watch(client, tmp_path) == "problem"
 
@@ -495,6 +506,16 @@ def test_every_watch_result_exits_0(
     monkeypatch.setattr(jenkins_watch, "make_client", MagicMock)
     monkeypatch.setattr(jenkins_watch, "watch", lambda *_: result)
     assert jenkins_watch.main(["--job", "A/Executor"]) == 0
+
+
+def test_default_interval_is_15_seconds(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[float] = []
+    monkeypatch.setattr(jenkins_watch, "make_client", MagicMock)
+    monkeypatch.setattr(
+        jenkins_watch, "watch", lambda _, options: seen.append(options.interval) or "idle"
+    )
+    jenkins_watch.main(["--job", "A/Executor"])
+    assert seen == [15]
 
 
 def test_jenkins_error_result_exits_3(monkeypatch: pytest.MonkeyPatch) -> None:

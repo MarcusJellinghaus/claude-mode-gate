@@ -4,7 +4,8 @@
 First reports the current state: the running builds, else the newest build;
 if that one ended badly, it exits at once (skip with --watch-only). Then polls
 the newest builds, of one issue or of all, and prints new builds and status
-changes. A running build is fine as long as its console log grows. Each
+changes. A running build is fine as long as its console log grows (checked
+every few minutes; the polls themselves only list builds). Each
 finished, stalled or still running build it reports gets its console log saved
 and scanned for errors, warnings and the lines that decide a workflow step. A
 successful build does not end the watch. All Jenkins
@@ -17,7 +18,7 @@ The last line is the result:
     RESULT: problem        a build ended failure, unstable or aborted
     RESULT: stalled        a running build's log did not grow for --stall minutes
     RESULT: heartbeat      a build still runs (and its log grows) after --report minutes
-    RESULT: jenkins-error  Jenkins failed several polls in a row
+    RESULT: jenkins-error  Jenkins failed every poll for 5 minutes
 
 Exit codes: 0 for every result above except jenkins-error, which exits 3 like
 any other Jenkins or configuration failure; 2 for bad arguments.
@@ -52,7 +53,11 @@ PROBLEM_STATUSES = frozenset({"failure", "unstable", "aborted"})
 MAX_PRINTED_MATCHES = 25
 # Warnings can be long and are rarely the cause; errors and decisions print in full.
 MAX_WARNING_WIDTH = 200
-MAX_JENKINS_ERRORS = 3
+# Give up after Jenkins failed every poll for this long, whatever the interval.
+JENKINS_ERROR_MINUTES = 5
+# Only the stall check downloads a running build's log; the client has no cheaper
+# way to see its size. Every few minutes is plenty against a stall limit of an hour.
+LOG_CHECK_MINUTES = 5
 # Jenkins' Text Finder plugin quotes the patterns it searched for, " - ERROR - " included.
 IGNORED_PREFIX = "[Text Finder]"
 # The Executor script echoes these around the mcp-coder command. Anchored, so the
@@ -331,10 +336,15 @@ def watch(
         say(f"RESULT: {name}{detail}")
         return name
 
-    # Per running build: log length at the last poll, and when it last grew.
+    # Per running build: log length at the last check, and when it last grew.
     log_growth: dict[tuple[str, int], tuple[int, float]] = {}
+    next_log_check = now()
 
     def stalled_build(builds: list[BuildInfo]) -> BuildInfo | None:
+        nonlocal next_log_check
+        if now() < next_log_check:
+            return None
+        next_log_check = now() + LOG_CHECK_MINUTES * 60
         for build in running(builds):
             length = len(client.get_console_output(build.job_path, build.number))
             seen = log_growth.get((build.job_path, build.number))
@@ -345,7 +355,7 @@ def watch(
         return None
 
     start = last_active = now()
-    jenkins_errors = 0
+    failing_since: float | None = None
     previous = list_builds()
     stalled_build(previous)
     for build in running(previous):
@@ -374,11 +384,15 @@ def watch(
         try:
             current = list_builds()
             stalled = stalled_build(current)
-            jenkins_errors = 0
+            failing_since = None
         except JenkinsError as e:
-            say(f"Jenkins error: {e}")
-            jenkins_errors += 1
-            if jenkins_errors >= MAX_JENKINS_ERRORS:
+            # Printed at the first and the last failed poll only, so a short interval
+            # doesn't fill the output.
+            if failing_since is None:
+                failing_since = now()
+                say(f"Jenkins error: {e}")
+            elif now() - failing_since >= JENKINS_ERROR_MINUTES * 60:
+                say(f"Jenkins error: {e}")
                 return result("jenkins-error")
             continue
 
@@ -463,7 +477,13 @@ def main(argv: list[str] | None = None) -> int:
         "--job", help="job or folder path (default: the configured executor job)"
     )
     parser.add_argument("--limit", type=int, default=30, help="newest N builds (default: 30)")
-    parser.add_argument("--interval", type=positive_float, default=120, help="seconds (default: 120)")
+    parser.add_argument(
+        "--interval",
+        type=positive_float,
+        default=15,
+        help="seconds between build listings (default: 15); a running build's log "
+        f"is checked every {LOG_CHECK_MINUTES} min",
+    )
     parser.add_argument("--idle", type=positive_float, default=20, help="minutes (default: 20)")
     parser.add_argument(
         "--stall",
