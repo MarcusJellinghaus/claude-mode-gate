@@ -1,0 +1,52 @@
+---
+description: Follow an issue's (or all) mcp-coder Jenkins builds until something needs a look, then analyse it
+argument-hint: "[issue number] [repo, default claude-mode-gate]"
+allowed-tools:
+  - Bash(python tools/jenkins_watch.py *)
+  - mcp__mcp-workspace__read_file
+  - mcp__mcp-workspace__search_files
+  - mcp__mcp-workspace__github_issue_view
+  - mcp__mcp-workspace__read_reference_file
+  - mcp__mcp-workspace__delete_directory
+---
+
+# Jenkins Watch
+
+Follows mcp-coder's automated workflow on Jenkins (create-plan, review-plan, implement, create-pr, ...) and comes back only when something needs a look. The polling is done by `tools/jenkins_watch.py`, not by you, so waiting costs no tokens.
+
+**Arguments:** `$ARGUMENTS` — an issue number and optionally the repo name as it appears in the build name (default `claude-mode-gate`). No issue: watch all builds of the executor job.
+
+## Rules
+
+- **Approval before any GitHub write:** status labels, `blocked` / `wait`, comments, new issues. Propose first, then wait.
+- Don't read whole console logs yourself. They are long; the watcher saves them and the analysis subagent reads the relevant lines.
+- Background: mcp-coder's `docs/processes-prompts/development-process.md` (labels, steps) and `docs/processes-prompts/processes/failure-handling.md` (failure labels, retry labels), via `read_reference_file` with `reference_name="mcp-coder"`.
+
+## Loop
+
+1. **Start the watcher in the background** (`run_in_background: true`), and wait for its completion notice. Don't poll its output or sleep.
+
+   ```bash
+   python tools/jenkins_watch.py --issue <N> --repo <repo>
+   python tools/jenkins_watch.py            # all builds
+   ```
+
+   Defaults: poll every 120 s, `--idle 20` min, `--timeout 90` min. It prints each new build and status change; for each finished build it saves the log to `.scratch/jenkins/<job>_<n>.txt` and prints the scan: the command section's line range (between `command execution ===` and `archive after execution ===`), counts of errors, warnings and deciding lines, and the first 25 matches with line numbers.
+
+2. **Read the watcher's output** (the output file named in the completion notice) and act on the `RESULT:` line:
+
+   | Exit | `RESULT:` | Action |
+   |---|---|---|
+   | 0 | `idle` | `github_issue_view` the issue. Label a bot picks up (`02`, `05`, `08`, `14`, `17`) without `blocked` / `wait` → restart the watcher (step 1). Human-action label (`04`, `07`, `10`, ...) or closed → report: done, or what you need to do next |
+   | 1 | `problem` | Analyse (step 3). For `unstable`: if the label moved on as expected, it was a warning only → mention it and restart the watcher |
+   | 2 | `timeout` | A build ran too long. The scan of its log so far is in the output → analyse (step 3), then report |
+   | 3 | `jenkins-error` | Report. Suggest `mcp-coder verify` (JENKINS sections) |
+
+3. **Analyse a problem.**
+   - Read the failure comment on the issue first (`github_issue_view` with comments: Category / Stage / Error). It often settles the cause.
+   - Otherwise start a subagent (`general-purpose`) to read the log. Give it the log path, the command-section line range and the matches the watcher printed, and ask for: the cause in two or three sentences, with the deciding log lines quoted by line number; whether it is transient or needs a fix; the fix. Tell it to read only the command section with `read_file(start_line, end_line)`, and more only if the section does not explain the failure.
+   - More logs: `python tools/jenkins_watch.py --inspect <build number>` saves and scans one build, also a running one (its log so far).
+
+4. **Report** to the user: issue, build, step, result, cause, and a proposal: the fix, then the retry label from `failure-handling.md` (set with `github_issue_set_status` only after approval). After the fix and retry, offer to restart the watcher.
+
+5. **Clean up** when the watch ends: `delete_directory(".scratch/jenkins", recursive=True)`.

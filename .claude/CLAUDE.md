@@ -38,6 +38,7 @@ If you can't name the gap, use the MCP tool. Exempt: the approved `npm run` scri
 | PR review threads                                      | `github_review_comment_reply`, `github_review_thread_resolve`                                         |
 | Format, type-check, lint, test, every other gate       | `npm run <script>` via Bash (see Commands)                                                            |
 | Check a JS/TS/Node behaviour before claiming it        | scratch probe (below)                                                                                 |
+| Follow mcp-coder's Jenkins builds for an issue         | `/jenkins_watch` (`python tools/jenkins_watch.py`; tests: `python -m pytest tests/tools -q`)          |
 
 `.mcp-file-access` exposes `.claude-plugin/types/` and `node_modules/` read-only, although both are gitignored.
 
