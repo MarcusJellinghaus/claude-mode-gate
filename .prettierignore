@@ -6,3 +6,5 @@ reports/
 package-lock.json
 .claude/skills/
 .claude/agents/
+# mcp-coder's working files: it commits some without formatting, and the folder is deleted before merge (markdownlint skips it too).
+pr_info/
