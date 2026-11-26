@@ -67,7 +67,11 @@ class FakeClock:
 
 
 def run_watch(
-    client: MagicMock, tmp_path: Path, idle: float = 5, timeout: float = 60
+    client: MagicMock,
+    tmp_path: Path,
+    idle: float = 5,
+    timeout: float = 60,
+    watch_only: bool = False,
 ) -> int:
     clock = FakeClock()
     options = jenkins_watch.Options(
@@ -78,6 +82,7 @@ def run_watch(
         idle=idle,
         timeout=timeout,
         log_dir=tmp_path / "logs",
+        watch_only=watch_only,
     )
     return int(jenkins_watch.watch(client, options, sleep=clock.sleep, now=clock.time))
 
@@ -104,6 +109,41 @@ def test_failed_build_is_a_problem_and_its_log_is_scanned(
     assert "error 1, warning 0, decision 1" in out
     assert "1: 2026-11-26 18:04:00 - ERROR - LLM timed out" in out
     assert "RESULT: problem" in out
+
+
+def test_newest_build_failed_is_reported_at_once(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    client = client_listing([build(2, "failure"), build(1, "success")])
+    assert run_watch(client, tmp_path) == 1
+    assert client.get_recent_builds.call_count == 1
+    client.get_console_output.assert_called_once_with("Windows-Agents/Executor", 2)
+    out = capsys.readouterr().out
+    assert "newest failure" in out
+    assert "RESULT: problem" in out
+
+
+def test_older_failure_while_a_build_runs_keeps_watching(tmp_path: Path) -> None:
+    client = client_listing(
+        [build(2, "running"), build(1, "failure")],
+        [build(2, "success"), build(1, "failure")],
+    )
+    assert run_watch(client, tmp_path) == 0
+
+
+def test_newest_build_succeeded_keeps_watching(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    client = client_listing([build(1, "success")])
+    assert run_watch(client, tmp_path) == 0
+    client.get_console_output.assert_not_called()
+    assert "newest success" in capsys.readouterr().out
+
+
+def test_watch_only_skips_the_initial_check(tmp_path: Path) -> None:
+    client = client_listing([build(1, "failure")])
+    assert run_watch(client, tmp_path, watch_only=True) == 0
+    client.get_console_output.assert_not_called()
 
 
 @pytest.mark.parametrize("status", ["unstable", "aborted"])

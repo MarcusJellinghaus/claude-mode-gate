@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Watch Jenkins builds and exit when something needs a look.
 
-Polls the newest builds, of one issue or of all, and prints new builds and
-status changes. Each finished build, and on timeout each running build, gets
+First reports the current state: the running builds, else the newest build;
+if that one ended badly, it exits at once (skip with --watch-only). Then polls
+the newest builds, of one issue or of all, and prints new builds and status
+changes. Each finished build, and on timeout each running build, gets
 its console log saved and scanned for errors, warnings and the lines that
 decide a workflow step. A successful build does not end the watch. All Jenkins
 logic lives in ``mcp_coder.utils.jenkins_operations``, so run it with a Python
@@ -75,6 +77,7 @@ class Options:
     idle: float
     timeout: float
     log_dir: Path
+    watch_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -243,6 +246,13 @@ def watch(
     previous = list_builds()
     for build in running(previous):
         say(describe(build))
+    if not options.watch_only and previous and not running(previous):
+        newest = previous[0]
+        say(f"newest {describe(newest)}")
+        if newest.status in PROBLEM_STATUSES:
+            inspect_log(client, newest.job_path, newest.number, options.log_dir)
+            say("RESULT: problem")
+            return 1
     target = options.pattern.pattern if options.pattern else "all builds"
     say(f"watching {target} in {options.job or 'the whole server'}; {len(previous)} builds known")
 
@@ -340,6 +350,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--inspect", type=int, metavar="N", help="only save and scan build N's log, then exit"
     )
+    parser.add_argument(
+        "--watch-only",
+        action="store_true",
+        help="skip the initial check of the newest build, e.g. right after a retry",
+    )
     args = parser.parse_args(argv)
     if args.repo and args.issue is None:
         parser.error("--repo needs --issue")
@@ -361,6 +376,7 @@ def main(argv: list[str] | None = None) -> int:
         idle=args.idle,
         timeout=args.timeout,
         log_dir=args.log_dir,
+        watch_only=args.watch_only,
     )
     try:
         return watch(client, options)
