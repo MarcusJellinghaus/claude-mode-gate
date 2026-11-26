@@ -33,7 +33,7 @@ Follows mcp-coder's automated workflow on Jenkins (create-plan, review-plan, imp
 
    It first checks the current state: it prints the running builds, else the newest build, and if that one ended badly it exits at once with `problem` and the log scan. Only if nothing needs a look does it wait. Right after a retry, add `--watch-only`: the old failure is still the newest build until the coordinator starts the new one.
 
-   Defaults: poll every 120 s, `--idle 20` min, `--timeout 90` min. It prints each new build and status change; for each finished build it saves the log to `.scratch/jenkins/<job>_<n>.txt` and prints the scan: the command section's line range (between `command execution ===` and `archive after execution ===`), counts of errors, warnings and deciding lines, and the first 25 matches with line numbers.
+   Defaults: poll every 120 s, `--idle 20` min, `--stall 60` min, `--report 120` min. A running build is fine as long as its console log grows; long implementations (two hours and more) are normal. It prints each new build and status change; for each finished build it saves the log to `.scratch/jenkins/<job>_<n>.txt` and prints the scan: the command section's line range (between `command execution ===` and `archive after execution ===`), counts of errors, warnings and deciding lines, and the first 25 matches with line numbers.
 
 2. **Read the watcher's output** (the output file named in the completion notice) and act on the `RESULT:` line:
 
@@ -41,8 +41,9 @@ Follows mcp-coder's automated workflow on Jenkins (create-plan, review-plan, imp
    |---|---|---|
    | 0 | `idle` | `github_issue_view` the issue. Label a bot picks up (`02`, `05`, `08`, `14`, `17`) without `blocked` / `wait` → restart the watcher (step 1). Human-action label (`04`, `07`, `10`, ...) or closed → report: done, or what you need to do next |
    | 1 | `problem` | Analyse (step 3). For `unstable`: if the label moved on as expected, it was a warning only → mention it and restart the watcher |
-   | 2 | `timeout` | A build ran too long. The scan of its log so far is in the output → analyse (step 3), then report |
+   | 2 | `stalled` | A running build wrote no log output for `--stall` minutes. The scan of its log so far is in the output → analyse (step 3), then report |
    | 3 | `jenkins-error` | Report. Suggest `mcp-coder verify` (JENKINS sections) |
+   | 4 | `heartbeat` | Still running, log still growing. Tell the user in one or two lines (step, how long, anything the scan flagged), then restart with `--watch-only` |
 
 3. **Analyse a problem.**
    - Read the failure comment on the issue first (`github_issue_view` with comments: Category / Stage / Error). It often settles the cause.

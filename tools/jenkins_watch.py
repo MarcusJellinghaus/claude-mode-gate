@@ -4,9 +4,10 @@
 First reports the current state: the running builds, else the newest build;
 if that one ended badly, it exits at once (skip with --watch-only). Then polls
 the newest builds, of one issue or of all, and prints new builds and status
-changes. Each finished build, and on timeout each running build, gets
-its console log saved and scanned for errors, warnings and the lines that
-decide a workflow step. A successful build does not end the watch. All Jenkins
+changes. A running build is fine as long as its console log grows. Each
+finished, stalled or still running build it reports gets its console log saved
+and scanned for errors, warnings and the lines that decide a workflow step. A
+successful build does not end the watch. All Jenkins
 logic lives in ``mcp_coder.utils.jenkins_operations``, so run it with a Python
 that has mcp-coder installed (the launcher's tool env); the script itself uses
 only the standard library besides that.
@@ -14,8 +15,9 @@ only the standard library besides that.
 Exit codes:
     0  idle: no build ran for --idle minutes
     1  problem: a build ended failure, unstable or aborted
-    2  timeout: --timeout minutes passed
+    2  stalled: a running build's log did not grow for --stall minutes
     3  Jenkins could not be read, or it is not configured
+    4  heartbeat: a build still runs (and its log grows) after --report minutes
 
 The scan covers the mcp-coder command's output, between the Executor's
 "command execution ===" and "archive after execution ===" lines, and prints
@@ -23,7 +25,8 @@ that line range so a reader can open just that part of the saved log.
 
 Usage:
     python tools/jenkins_watch.py [--issue N [--repo NAME]] [--job PATH]
-        [--interval SECONDS] [--idle MINUTES] [--timeout MINUTES]
+        [--interval SECONDS] [--idle MINUTES] [--stall MINUTES] [--report MINUTES]
+        [--watch-only]
     python tools/jenkins_watch.py --inspect BUILD_NUMBER [--job PATH]
 """
 
@@ -68,14 +71,15 @@ LOG_PATTERNS = (
 
 @dataclass(frozen=True)
 class Options:
-    """What to watch and for how long. Intervals in seconds, idle and timeout in minutes."""
+    """What to watch and for how long. Interval in seconds, the others in minutes."""
 
     job: str | None
     pattern: re.Pattern[str] | None
     limit: int
     interval: float
     idle: float
-    timeout: float
+    stall: float
+    report: float
     log_dir: Path
     watch_only: bool = False
 
@@ -241,9 +245,23 @@ def watch(
     def running(builds: list[BuildInfo]) -> list[BuildInfo]:
         return [b for b in builds if b.status == "running"]
 
+    # Per running build: log length at the last poll, and when it last grew.
+    log_growth: dict[tuple[str, int], tuple[int, float]] = {}
+
+    def stalled_build(builds: list[BuildInfo]) -> BuildInfo | None:
+        for build in running(builds):
+            length = len(client.get_console_output(build.job_path, build.number))
+            seen = log_growth.get((build.job_path, build.number))
+            if seen is None or seen[0] != length:
+                log_growth[(build.job_path, build.number)] = (length, now())
+            elif now() - seen[1] >= options.stall * 60:
+                return build
+        return None
+
     start = last_active = now()
     jenkins_errors = 0
     previous = list_builds()
+    stalled_build(previous)
     for build in running(previous):
         say(describe(build))
     if not options.watch_only and previous and not running(previous):
@@ -259,12 +277,12 @@ def watch(
     while True:
         if running(previous):
             last_active = now()
-        if now() - start >= options.timeout * 60:
-            for build in running(previous):
-                say(f"still {describe(build)}")
-                inspect_log(client, build.job_path, build.number, options.log_dir)
-            say("RESULT: timeout")
-            return 2
+            if now() - start >= options.report * 60:
+                for build in running(previous):
+                    say(f"still {describe(build)}")
+                    inspect_log(client, build.job_path, build.number, options.log_dir)
+                say("RESULT: heartbeat")
+                return 4
         if now() - last_active >= options.idle * 60:
             newest = f"; newest {describe(previous[0])}" if previous else ""
             say(f"RESULT: idle{newest}")
@@ -273,6 +291,7 @@ def watch(
         sleep(options.interval)
         try:
             current = list_builds()
+            stalled = stalled_build(current)
             jenkins_errors = 0
         except JenkinsError as e:
             say(f"Jenkins error: {e}")
@@ -291,6 +310,11 @@ def watch(
         if any(b.status in PROBLEM_STATUSES for b in changed):
             say("RESULT: problem")
             return 1
+        if stalled is not None:
+            say(f"no new log output for {options.stall:g} min: {describe(stalled)}")
+            inspect_log(client, stalled.job_path, stalled.number, options.log_dir)
+            say("RESULT: stalled")
+            return 2
 
 
 def configured_executor_job() -> str | None:
@@ -343,7 +367,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=30, help="newest N builds (default: 30)")
     parser.add_argument("--interval", type=positive_float, default=120, help="seconds (default: 120)")
     parser.add_argument("--idle", type=positive_float, default=20, help="minutes (default: 20)")
-    parser.add_argument("--timeout", type=positive_float, default=90, help="minutes (default: 90)")
+    parser.add_argument(
+        "--stall",
+        type=positive_float,
+        default=60,
+        help="minutes without new log output before a running build counts as stalled (default: 60)",
+    )
+    parser.add_argument(
+        "--report",
+        type=positive_float,
+        default=120,
+        help="minutes after which a still running build is reported (default: 120)",
+    )
     parser.add_argument(
         "--log-dir", type=Path, default=Path(".scratch/jenkins"), help="(default: .scratch/jenkins)"
     )
@@ -374,7 +409,8 @@ def main(argv: list[str] | None = None) -> int:
         limit=args.limit,
         interval=args.interval,
         idle=args.idle,
-        timeout=args.timeout,
+        stall=args.stall,
+        report=args.report,
         log_dir=args.log_dir,
         watch_only=args.watch_only,
     )

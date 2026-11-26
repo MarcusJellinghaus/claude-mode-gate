@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -70,7 +71,8 @@ def run_watch(
     client: MagicMock,
     tmp_path: Path,
     idle: float = 5,
-    timeout: float = 60,
+    stall: float = 60,
+    report: float = 120,
     watch_only: bool = False,
 ) -> int:
     clock = FakeClock()
@@ -80,7 +82,8 @@ def run_watch(
         limit=30,
         interval=60,
         idle=idle,
-        timeout=timeout,
+        stall=stall,
+        report=report,
         log_dir=tmp_path / "logs",
         watch_only=watch_only,
     )
@@ -98,12 +101,23 @@ def client_listing(*listings: list[BuildInfo]) -> MagicMock:
     return client
 
 
+def growing_log() -> Callable[..., str]:
+    """get_console_output side effect: one line more on every call."""
+    lines: list[str] = []
+
+    def fetch(*_: object) -> str:
+        lines.append("- INFO - working")
+        return "\n".join(lines)
+
+    return fetch
+
+
 def test_failed_build_is_a_problem_and_its_log_is_scanned(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     client = client_listing([build(1, "running")], [build(1, "failure")])
     assert run_watch(client, tmp_path) == 1
-    client.get_console_output.assert_called_once_with("Windows-Agents/Executor", 1)
+    client.get_console_output.assert_called_with("Windows-Agents/Executor", 1)
     assert (tmp_path / "logs" / "Executor_1.txt").read_text(encoding="utf-8") == FAILING_LOG
     out = capsys.readouterr().out
     assert "error 1, warning 0, decision 1" in out
@@ -157,8 +171,9 @@ def test_success_keeps_watching_until_idle(
 ) -> None:
     client = client_listing([build(1, "running")], [build(1, "success")])
     assert run_watch(client, tmp_path) == 0
-    client.get_console_output.assert_called_once()
-    assert "RESULT: idle" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "log: " in out
+    assert "RESULT: idle" in out
 
 
 def test_new_build_keeps_watching(tmp_path: Path) -> None:
@@ -170,13 +185,41 @@ def test_new_build_keeps_watching(tmp_path: Path) -> None:
     assert run_watch(client, tmp_path) == 1
 
 
-def test_timeout_scans_the_running_build_so_far(
+def test_log_without_new_output_for_stall_minutes_is_stalled(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     client = client_listing([build(1, "running")])
-    assert run_watch(client, tmp_path, timeout=3) == 2
-    client.get_console_output.assert_called_once_with("Windows-Agents/Executor", 1)
-    assert "RESULT: timeout" in capsys.readouterr().out
+    assert run_watch(client, tmp_path, stall=3) == 2
+    out = capsys.readouterr().out
+    assert "no new log output for 3 min" in out
+    assert "log: " in out
+    assert "RESULT: stalled" in out
+
+
+def test_growing_log_is_not_stalled_and_reports_a_heartbeat(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    client = client_listing([build(1, "running")])
+    client.get_console_output.side_effect = growing_log()
+    assert run_watch(client, tmp_path, stall=3, report=10) == 4
+    out = capsys.readouterr().out
+    assert "still running  #1" in out
+    assert "RESULT: heartbeat" in out
+
+
+def test_stall_clock_restarts_when_the_log_grows(tmp_path: Path) -> None:
+    client = client_listing([build(1, "running")])
+    logs = ["a", "a", "a\nb", "a\nb", "a\nb", "a\nb", "a\nb"]
+    client.get_console_output.side_effect = lambda *_: logs.pop(0) if len(logs) > 1 else logs[0]
+    # Polls each minute; the log grows at minute 2, so with stall=3 it stalls at
+    # minute 5 (the 6th listing), not at minute 3.
+    assert run_watch(client, tmp_path, stall=3) == 2
+    assert client.get_recent_builds.call_count == 6
+
+
+def test_no_heartbeat_while_nothing_runs(tmp_path: Path) -> None:
+    client = client_listing([build(1, "success")])
+    assert run_watch(client, tmp_path, idle=30, report=10) == 0
 
 
 def test_jenkins_errors_in_a_row_end_the_watch(tmp_path: Path) -> None:
