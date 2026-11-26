@@ -33,5 +33,5 @@ See [step_1.md](./steps/step_1.md).
 
 ## Pull Request
 
-- [ ] PR review: review the full branch diff against `main`
+- [x] PR review: review the full branch diff against `main`
 - [ ] PR summary prepared
