@@ -210,6 +210,8 @@ jobs:
 
   # Runs on push and PR: the PR run tests the merge commit. The 95% threshold on policy.ts
   # is part of test:coverage, so there is no separate coverage job.
+  # Windows because the path guards must hold there; one Node version, since the code uses
+  # nothing that differs between the supported ones.
   unit-tests:
     name: unit-tests (Node ${{ matrix.node }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -217,7 +219,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: [22, 24]
+        node: [24]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
