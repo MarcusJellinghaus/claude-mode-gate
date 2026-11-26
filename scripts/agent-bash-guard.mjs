@@ -1,8 +1,12 @@
 // PreToolUse hook for the agents in .claude/agents: a Bash call passes only if it is exactly
-// `npm run <script>` for a script named on the command line. The hook only ever denies; a call
-// it lets through still goes through the normal permission rules, so it narrows and never widens.
+// `npm run <script>` for a script named on the command line, or, when `test` is named, one test
+// file under tests/. The hook only ever denies; a call it lets through still goes through the
+// normal permission rules, so it narrows and never widens.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+
+// Directory names without dots, so no `..`; nothing a shell would expand.
+const ONE_TEST_FILE = /^npm run test -- tests\/(?:[\w-]+\/)*[\w.-]+\.test\.ts$/;
 
 /**
  * @param {unknown} input the hook's stdin JSON
@@ -11,14 +15,18 @@ import { fileURLToPath } from "node:url";
  */
 export function denyReason(input, allowedScripts) {
   const allowed = allowedScripts.map((script) => `npm run ${script}`);
-  const reason = `This agent may only run: ${allowed.join(", ") || "no Bash commands"}.`;
+  const testFileAllowed = allowedScripts.includes("test");
+  const shown = testFileAllowed ? [...allowed, "npm run test -- tests/<name>.test.ts"] : allowed;
+  const reason = `This agent may only run: ${shown.join(", ") || "no Bash commands"}.`;
   if (typeof input !== "object" || input === null || !("tool_input" in input)) return reason;
   const toolInput = input.tool_input;
   if (typeof toolInput !== "object" || toolInput === null || !("command" in toolInput))
     return reason;
   const command = toolInput.command;
   if (typeof command !== "string") return reason;
-  return allowed.includes(command.trim()) ? undefined : reason;
+  const trimmed = command.trim();
+  if (allowed.includes(trimmed)) return undefined;
+  return testFileAllowed && ONE_TEST_FILE.test(trimmed) ? undefined : reason;
 }
 
 /**
