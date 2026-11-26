@@ -7,6 +7,12 @@ reports/
 .claude/settings.local.json
 logs/
 .vscode/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+
+# mcp-coder session logs (written by the automated workflows)
+/.mcp-coder/*
 
 # VSCodeClaude session files (auto-generated)
 .vscodeclaude_status.txt
