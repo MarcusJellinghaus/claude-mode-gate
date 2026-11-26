@@ -48,8 +48,10 @@ function lastLines(output, gate) {
  * @returns {number} the exit code: 0, or the failing gate's
  */
 export function runGates(gates, run, print) {
+  let total = 0;
   for (const [index, gate] of gates.entries()) {
     const { status, output, seconds } = run(gate);
+    total += seconds;
     const time = `${seconds.toFixed(1)}s`;
     if (status === 0) {
       print(`ok    ${gate} (${time})`);
@@ -63,7 +65,7 @@ export function runGates(gates, run, print) {
     print(`check: ${gate} failed${notRun.length > 0 ? `; not run: ${notRun.join(", ")}` : ""}`);
     return status ?? 1;
   }
-  print(`check: ok (${String(gates.length)} gates)`);
+  print(`check: ok (${String(gates.length)} gates, ${total.toFixed(1)}s)`);
   return 0;
 }
 

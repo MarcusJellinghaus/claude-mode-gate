@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { GATES, runGates } from "../scripts/check.mjs";
 
-type Outcome = { status: number | null; output?: string };
+type Outcome = { status: number | null; output?: string; seconds?: number };
 
 // Runs the gates against canned outcomes (default: pass, no output) and records
 // which gates ran and what was printed.
@@ -13,8 +13,8 @@ function check(outcomes: Record<string, Outcome>, gates: readonly string[] = ["a
     gates,
     (gate) => {
       ran.push(gate);
-      const { status, output = "" } = outcomes[gate] ?? { status: 0 };
-      return { status, output, seconds: 1.25 };
+      const { status, output = "", seconds = 1.25 } = outcomes[gate] ?? { status: 0 };
+      return { status, output, seconds };
     },
     (line) => printed.push(line),
   );
@@ -32,8 +32,13 @@ describe("runGates", () => {
       "ok    a (1.3s)",
       "ok    b (1.3s)",
       "ok    c (1.3s)",
-      "check: ok (3 gates)",
+      "check: ok (3 gates, 3.8s)",
     ]);
+  });
+
+  it("sums the gates' raw times on the summary line", () => {
+    const { printed } = check({ a: { status: 0, seconds: 0.5 } }, ["a", "b"]);
+    expect(printed.at(-1)).toBe("check: ok (2 gates, 1.8s)");
   });
 
   it("stops at the first failing gate and names the gates not run", () => {

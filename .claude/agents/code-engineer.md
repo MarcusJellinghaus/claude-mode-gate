@@ -30,7 +30,7 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
-          command: 'node "$CLAUDE_PROJECT_DIR/scripts/agent-bash-guard.mjs" check typecheck lint test format format:check arch deadcode'
+          command: 'node "$CLAUDE_PROJECT_DIR/scripts/agent-bash-guard.mjs" check typecheck lint test test:coverage format format:check arch deadcode docs:lint check:manifests check:catch check:pins check:docs'
 skills:
   - implementation_review
   - check_branch_status

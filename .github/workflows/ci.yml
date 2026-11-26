@@ -1,76 +1,135 @@
 name: CI
 
+# Structure follows mcp-coder's CI. Which job runs on which event:
+#   Feature push  → first-line checks + tests: fast, catch most errors early.
+#   Pull request  → backup checks + tests, and the PR-only folder checks.
+#   Main push, schedule, dispatch → both sets (post-merge and weekly safety net).
+#   Schedule and dispatch also run the mutation tests.
+# Every check runs at least once before merge, on push or on PR.
+# Job names are required-check names: don't rename them, and never skip a check with a step-level `if`.
+
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
+    branches: ["**"]
   schedule:
-    # Weekly: catches drift in dependencies and in the latest Claude Code release.
+    # Weekly: catches drift in dependencies and new advisories, and runs the mutation tests.
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push cancels the run of an older one on the same branch. Runs on main are not
+# cancelled, and the event is part of the group, so a push to main never cancels the weekly run.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  static:
-    name: Static checks (types, lint, format, architecture, dead code)
+  # PR only: pr_info/ is allowed on branches, not in a merge.
+  check-forbidden-folders:
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      # Claude Code lays the engine's `claude-code` types when it loads the mod; no login is needed.
-      - run: npm install --global @anthropic-ai/claude-code@2.1.292
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run arch
-      - run: npm run deadcode
+      - name: Check for forbidden folders in PR
+        run: |
+          FOUND=$(find . -path ./.git -prune -o -type d \( -iname pr_info -o -iname .scratch \) -print)
+          if [ -n "$FOUND" ]; then
+            echo "::error::Remove these folders before merging (allowed on branches, not in a merge):"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "No forbidden folders."
 
-  test:
-    name: Unit tests and coverage (Node ${{ matrix.node }}, ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+  # PR only, advisory: warns when a PR changes sensitive files; never fails on findings.
+  # HEAD^1 is the base tip of GitHub's merge commit (needs fetch-depth: 2).
+  check-sensitive-files:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - name: Check for sensitive files in PR
+        run: |
+          # Flags files that are read-only under the base branch's .mcp-file-access,
+          # the rules file itself, and the watch list. Patterns are literal paths from
+          # the repo root; a trailing / covers the folder. Last matching rule wins,
+          # case-insensitive like the MCP server on Windows.
+          WATCH_LIST=(/package.json /.claude/agents/ /.claude/skills/ /.github/workflows/)
+          shopt -s nocasematch
+
+          matches() {  # <path> <pattern>
+            local pattern="${2#/}"
+            [[ "$1" == "$pattern" || "$1" == "${pattern%/}/"* ]]
+          }
+
+          reasons() {  # <path>
+            local level="" rule="" lvl pattern out=""
+            while read -r lvl pattern _; do
+              if [[ "$lvl" == read-* ]] && matches "$1" "$pattern"; then level=$lvl; rule=$pattern; fi
+            done <<< "$RULES"
+            if [[ "$level" == read-only ]]; then out="read-only rule $rule"; fi
+            if [[ "$1" == .mcp-file-access ]]; then out="${out:+$out; }rules file"; fi
+            for pattern in "${WATCH_LIST[@]}"; do
+              if matches "$1" "$pattern"; then out="${out:+$out; }watch list $pattern"; fi
+            done
+            echo "$out"
+          }
+
+          # Base rules only, so a PR can't drop a rule for itself.
+          if ! RULES=$(git show "HEAD^1:.mcp-file-access" 2>/dev/null); then
+            echo "No .mcp-file-access on the base branch: read-only rule check skipped."
+          fi
+          RULES=${RULES//$'\r'/}
+          # --no-renames: a rename lists the old path too.
+          CHANGED=$(git -c core.quotePath=false diff --name-only --no-renames HEAD^1 HEAD)
+
+          TABLE=""
+          while IFS= read -r path; do
+            [[ -n "$path" ]] || continue
+            r=$(reasons "$path")
+            [[ -n "$r" ]] || continue
+            file=${path//%/%25}; file=${file//:/%3A}; file=${file//,/%2C}
+            echo "::warning file=$file::${r//%/%25}"
+            TABLE+="| ${path//|/\\|} | $r |"$'\n'
+          done <<< "$CHANGED"
+
+          # Annotations show only ~10 per step; the summary lists every file.
+          if [[ -n "$TABLE" ]]; then
+            SUMMARY=$'## Sensitive files changed\n\n| File | Reasons |\n|---|---|\n'"$TABLE"
+          else
+            SUMMARY="No sensitive files changed."
+          fi
+          echo "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+
+  # First-line checks: the static gates of `npm run check`, on every push, not again on the PR.
+  # One job per gate, so each has its own pass/fail status; fail-fast: false runs them all.
+  # `types: true` gates need the engine's `claude-code` types, which Claude Code lays when it
+  # loads the mod; no login is needed.
+  # TODO (Draft 10): add `claude plugin validate` and `claude plugin test`, pinned to a Claude
+  # Code version. Both run without a login (docs/design.md, "Assumptions", row 23).
+  push-checks:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        node: [22, 24]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ matrix.node }}
-          cache: npm
-      - run: npm ci
-      - run: npm run test:coverage
-
-  plugin:
-    name: Plugin manifests and fail-closed guard
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run check:manifests
-      - run: npm run check:catch
-      - run: npm run check:pins
-      # TODO (Draft 10): add `claude plugin validate` and `claude plugin test`, pinned to a Claude
-      # Code version. Both run without a login (docs/design.md, "Assumptions", row 23).
-
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
+        check:
+          - { name: "typecheck", types: true }
+          - { name: "lint", types: true }
+          - { name: "format:check" }
+          - { name: "arch" }
+          - { name: "deadcode" }
+          - { name: "docs:lint" }
+          - { name: "check:manifests" }
+          - { name: "check:catch" }
+          - { name: "check:pins" }
+          - { name: "check:docs" }
+    name: ${{ matrix.check.name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -78,8 +137,38 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run docs:lint
-      - run: npm run check:docs
+      - name: Lay the engine types
+        if: matrix.check.types
+        run: |
+          npm install --global @anthropic-ai/claude-code@2.1.292
+          npm run types:lay
+      - name: Environment info
+        run: |
+          uname -a
+          node --version
+          npm --version
+          git --version
+      - name: Run ${{ matrix.check.name }}
+        run: npm run ${{ matrix.check.name }}
+
+  # First-line, like push-checks: a secret is best caught as soon as it is pushed.
+  secret-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # First-line, beside docs:lint. Offline: checks local links and fragments only.
+  link-check:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Link check
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
@@ -91,28 +180,59 @@ jobs:
             "./*.md"
           fail: true
 
-  security:
-    name: Dependency audit and secret scan
+  # Backup checks: run on PR, main push, schedule and dispatch.
+  # audit depends on the lockfile and on new advisories, not on a branch's code;
+  # the weekly run catches new advisories.
+  pr-checks:
     runs-on: ubuntu-latest
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - { name: "audit" }
+    name: ${{ matrix.check.name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run audit
-      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Environment info
+        run: |
+          uname -a
+          node --version
+          npm --version
+          git --version
+      - name: Run ${{ matrix.check.name }}
+        run: npm run ${{ matrix.check.name }}
 
-  mutation:
-    name: Mutation tests (policy.ts)
-    # Slow, so weekly and on demand rather than on every PR.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+  # Runs on push and PR: the PR run tests the merge commit. The 95% threshold on policy.ts
+  # is part of test:coverage, so there is no separate coverage job.
+  # Windows because the path guards must hold there; one Node version, since the code uses
+  # nothing that differs between the supported ones.
+  unit-tests:
+    name: unit-tests (Node ${{ matrix.node }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [24]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run test:coverage
+
+  # Slow, so weekly and on demand rather than on every push or PR.
+  mutation-tests:
     runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
