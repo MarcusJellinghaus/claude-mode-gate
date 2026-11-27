@@ -40,3 +40,26 @@ applied
 applied
 applied
 applied
+
+## Round 2 — 2026-11-27
+
+**Findings**:
+
+`pr_info/steps/step_8.md:52` — medium — The algorithm handles `MODE_GATE_CONFIG` whenever it is "set". Only `trustedEnv` drops empty strings (line 43), yet the rows at lines 72 and 75 call `resolveConfigPath` directly with an empty `MODE_GATE_CONFIG` and expect it to fall through to `XDG_CONFIG_HOME` or the no-home issue. Built as written, an empty value hits the "must be absolute" error instead. Either have `resolveConfigPath` treat `""` as unset too, or run those rows through `trustedEnv` first.
+`pr_info/steps/step_11.md:43` — medium — No row covers a malformed user file (bad JSON). Issue #4 requires that "an unreadable or malformed user file is an error" that fails closed, with a file-level issue at path `''`. Step 11 has only "an unreadable file" and the vague "an invalid user file", and the only bad-JSON row is for the project file (Step 12). Add a user-file row with unparsable JSON: it should give `ok: false`, an empty baseline and an error with `source: 'user'` at path `''`.
+`pr_info/steps/step_7.md:43` — low — The claim "a plain tool name never has `__` after it" is false under Step 2's grammar, where a plain name is `^[A-Za-z0-9_-]+$`. So `covers(Foo, Foo__bar)` returns true while `decide` would not deny `Foo__bar`. That breaks the issue's rule that the validator and `decide` cannot disagree. Apply the server-prefix branch only when `p.tool` starts with `mcp__`.
+
+**Decisions**:
+
+tasks
+
+- pr_info/steps/step_8.md:52: make `resolveConfigPath` treat an empty `MODE_GATE_CONFIG` as unset, so the rows at lines 72 and 75 fall through to `XDG_CONFIG_HOME` or the no-home issue instead of the 'must be absolute' error. State this in the algorithm.
+- pr_info/steps/step_11.md:43: add a user-file row with unparsable JSON. Expect `ok: false`, an empty baseline and an error with `source: 'user'` at path `''`, as issue #4 requires. Replace the vague 'an invalid user file' wording with concrete rows.
+- pr_info/steps/step_7.md:43: apply the server-prefix (`__`) branch in `covers` only when `p.tool` starts with `mcp__`, so `covers(Foo, Foo__bar)` is false and matches `decide`. Remove the false claim and add a negative row for `Foo` vs `Foo__bar`.
+
+**Changes**:
+
+applied
+applied
+applied
+applied
