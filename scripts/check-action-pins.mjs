@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const WORKFLOWS_DIR = ".github/workflows";
-const USES = /^\s*(?:-\s+)?uses:\s*["']?([^\s"'#]+)/gm;
+const USES = /^\s*(?:-\s)?\s*uses:\s*["']?([^\s"'#]+)/gm;
 const PINNED = /@[0-9a-f]{40}$/;
 
 /**

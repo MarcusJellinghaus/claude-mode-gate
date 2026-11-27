@@ -31,9 +31,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: `USES` without nested quantifiers — [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: two edge-case tests in `tests/check-action-pins.test.ts` (pass on today's regex), then rewrite `USES` in `scripts/check-action-pins.mjs`
-- [ ] Quality checks: `npm run format`, `npm run check` — fix all issues
-- [ ] Commit message prepared: `refactor(pins): make USES pass detect-unsafe-regex`
+- [x] Implementation: two edge-case tests in `tests/check-action-pins.test.ts` (pass on today's regex), then rewrite `USES` in `scripts/check-action-pins.mjs`
+- [x] Quality checks: `npm run format`, `npm run check` — fix all issues
+- [x] Commit message prepared: `refactor(pins): make USES pass detect-unsafe-regex`
 
 ### Step 3: Suppress the remaining security findings inline — [step_3.md](./steps/step_3.md)
 
