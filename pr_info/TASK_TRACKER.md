@@ -25,9 +25,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: dependency-cruiser rules for the config modules ([step_1.md](./steps/step_1.md))
 
-- [ ] Implementation: `tsPreCompilationDeps: true` and the three new rules in `.dependency-cruiser.cjs`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `tsPreCompilationDeps: true` and the three new rules in `.dependency-cruiser.cjs`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: `parseRule` and the per-file coverage gate ([step_2.md](./steps/step_2.md))
 
