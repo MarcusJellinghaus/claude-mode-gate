@@ -16,3 +16,17 @@ tasks
 
 applied
 applied
+
+## Round 2 — 2026-11-27
+
+**Findings**:
+
+NO FINDINGS
+
+**Decisions**:
+
+dismiss
+
+**Changes**:
+
+dismiss
