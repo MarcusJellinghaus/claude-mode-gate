@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- eslint-plugin-security's recommended rules run in `npm run lint`, which now fails on any warning (`--max-warnings 0`); findings are fixed or suppressed inline with a reason. `.npmrc` sets `ignore-scripts=true`, so dependency install scripts do not run.
 - Prettier formats and checks mcp-coder's `pr_info/` plan files and task tracker; review logs (`pr_info/*_review_log_*.md`) and the local issue-analysis log stay excluded.
 - CI follows mcp-coder's structure: it runs on a push to any branch and on pull requests. A push runs the first-line checks (one job per static gate of `npm run check`, the secret scan and the link check); a PR runs the backup check (`audit`), the PR-only `check-forbidden-folders` (no `pr_info/` or `.scratch/` in a merge) and the advisory `check-sensitive-files`; both run the unit tests, on Node 24 for Ubuntu and Windows (Node 22 dropped from the test matrix). Main push, the weekly run and dispatch run everything, and runs on main are no longer cancelled.
 - `npm run check` shows the total time on its success line: `check: ok (11 gates, 31.2s)`, the sum of the per-gate times.

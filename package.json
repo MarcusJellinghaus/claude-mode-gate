@@ -11,7 +11,7 @@
   "scripts": {
     "types:lay": "node scripts/lay-types.mjs --force",
     "typecheck": "node scripts/lay-types.mjs && tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "format:check": "prettier --check .",
     "format": "prettier --write --list-different .",
     "test": "vitest run",

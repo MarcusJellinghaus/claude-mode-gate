@@ -100,6 +100,7 @@ describe("GATES", () => {
       scripts: Record<string, string>;
     };
     expect(scripts["check"]).toBe("node scripts/check.mjs");
+    expect(scripts["lint"]).toBe("eslint . --max-warnings 0");
     for (const gate of GATES) expect(Object.keys(scripts)).toContain(gate);
   });
 });

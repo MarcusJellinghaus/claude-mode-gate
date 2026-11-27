@@ -43,9 +43,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 4: Fail lint on warnings, and document it — [step_4.md](./steps/step_4.md)
 
-- [ ] Implementation: pin `lint` in `tests/check.test.ts` (fails first), set `"lint": "eslint . --max-warnings 0"` in `package.json`, update `.claude/CLAUDE.md` and `CHANGELOG.md`
-- [ ] Quality checks: `npm run format`, `npm run check` — fix all issues
-- [ ] Commit message prepared: `chore(lint): fail lint on warnings and document eslint-plugin-security`
+- [x] Implementation: pin `lint` in `tests/check.test.ts` (fails first), set `"lint": "eslint . --max-warnings 0"` in `package.json`, update `.claude/CLAUDE.md` and `CHANGELOG.md`
+- [x] Quality checks: `npm run format`, `npm run check` — fix all issues
+- [x] Commit message prepared: `chore(lint): fail lint on warnings and document eslint-plugin-security`
 
 ## Pull Request
 
