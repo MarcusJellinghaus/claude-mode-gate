@@ -25,13 +25,12 @@ There are no unit tests: the change is ignore-file content, and a test asserting
 ## Files modified
 
 - `.prettierignore`: step 1
+- `.markdownlint-cli2.jsonc`: step 1
 - `CHANGELOG.md`: step 1
-- `.markdownlint-cli2.jsonc`: step 2
 - `pr_info/` plan files: reformatted by mcp-coder's `format@apply` in step 1's commit, not edited by hand
 
 No files or folders are created or deleted.
 
 ## Steps
 
-1. [step_1.md](./step_1.md): narrow `.prettierignore` to the two log patterns and add the CHANGELOG line.
-2. [step_2.md](./step_2.md): correct the markdownlint ignore comment.
+1. [step_1.md](./step_1.md): narrow `.prettierignore` to the two log patterns, correct the markdownlint ignore comment and add the CHANGELOG line.
