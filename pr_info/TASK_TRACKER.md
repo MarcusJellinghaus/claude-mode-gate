@@ -37,9 +37,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 3: Suppress the remaining security findings inline — [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: one inline `eslint-disable-next-line security/<rule> -- <why>` per remaining hit reported by `npm run lint`, until 0 warnings
-- [ ] Quality checks: `npm run format`, `npm run check` — fix all issues
-- [ ] Commit message prepared: `chore(lint): justify the remaining eslint-plugin-security findings`
+- [x] Implementation: one inline `eslint-disable-next-line security/<rule> -- <why>` per remaining hit reported by `npm run lint`, until 0 warnings
+- [x] Quality checks: `npm run format`, `npm run check` — fix all issues
+- [x] Commit message prepared: `chore(lint): justify the remaining eslint-plugin-security findings`
 
 ### Step 4: Fail lint on warnings, and document it — [step_4.md](./steps/step_4.md)
 

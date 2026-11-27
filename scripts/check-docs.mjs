@@ -31,6 +31,7 @@ export function findDocProblems({ exists, read, release }) {
 function main() {
   const problems = findDocProblems({
     exists: existsSync,
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths come from the fixed list of required docs
     read: (file) => readFileSync(file, "utf8"),
     release: process.env["RELEASE"] === "1",
   });

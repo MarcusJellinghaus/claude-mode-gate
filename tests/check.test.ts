@@ -13,6 +13,7 @@ function check(outcomes: Record<string, Outcome>, gates: readonly string[] = ["a
     gates,
     (gate) => {
       ran.push(gate);
+      // eslint-disable-next-line security/detect-object-injection -- gate name comes from the test's own gate list
       const { status, output = "", seconds = 1.25 } = outcomes[gate] ?? { status: 0 };
       return { status, output, seconds };
     },

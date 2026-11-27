@@ -16,6 +16,7 @@ describe("findManifestProblems", () => {
 
   it.each(["name", "version", "description"])("reports a missing %s in plugin.json", (key) => {
     const manifests = valid();
+    // eslint-disable-next-line security/detect-object-injection -- key comes from the test table
     manifests.plugin[key] = undefined;
     expect(findManifestProblems(manifests, always)).toContain(`plugin.json: missing "${key}"`);
   });

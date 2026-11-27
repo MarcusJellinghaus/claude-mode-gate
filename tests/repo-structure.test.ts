@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
+// eslint-disable-next-line security/detect-non-literal-fs-filename -- test helper, called only with literal repo paths
 const read = (path: string): string => readFileSync(path, "utf8");
 
 describe("repo structure", () => {

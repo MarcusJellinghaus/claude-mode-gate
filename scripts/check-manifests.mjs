@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 function pluginProblems(plugin) {
   return ["name", "version", "description"]
     .filter((key) => {
+      // eslint-disable-next-line security/detect-object-injection -- key comes from the fixed list above
       const value = plugin?.[/** @type {keyof Manifest} */ (key)];
       return typeof value !== "string" || value === "";
     })
@@ -103,6 +104,7 @@ function main() {
    */
   const load = (path) => {
     try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- called only with the fixed manifest paths below
       const parsed = /** @type {unknown} */ (JSON.parse(readFileSync(path, "utf8")));
       return /** @type {Manifest} */ (parsed);
     } catch (err) {
@@ -118,6 +120,7 @@ function main() {
   };
   const errors = [
     ...loadErrors,
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- module entry from the repo's own hooks.json, existence check only
     ...findManifestProblems(manifests, (entry) => existsSync(resolve("hooks", entry))),
   ];
   if (errors.length > 0) {

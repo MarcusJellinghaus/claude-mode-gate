@@ -27,6 +27,7 @@ export function findUncruised(cruisedPaths, sourceFiles) {
  * @returns {string[]}
  */
 function listSources(dir) {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- walks the fixed ROOTS directories
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) return listSources(path);

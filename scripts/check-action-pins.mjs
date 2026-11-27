@@ -20,6 +20,7 @@ export function findUnpinned(workflowText) {
 function main() {
   const files = readdirSync(WORKFLOWS_DIR).filter((name) => /\.ya?ml$/.test(name));
   const offenders = files.flatMap((name) =>
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- a file listed from the fixed workflows directory
     findUnpinned(readFileSync(join(WORKFLOWS_DIR, name), "utf8")).map((ref) => `${name}: ${ref}`),
   );
   if (offenders.length > 0) {

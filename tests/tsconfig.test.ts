@@ -21,6 +21,7 @@ describe("tsconfig.json", () => {
     "verbatimModuleSyntax",
     "erasableSyntaxOnly",
   ])("enables %s", (flag) => {
+    // eslint-disable-next-line security/detect-object-injection -- flag comes from the test table
     expect(tsconfig.compilerOptions[flag]).toBe(true);
   });
 
