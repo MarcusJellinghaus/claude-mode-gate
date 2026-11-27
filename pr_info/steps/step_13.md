@@ -1,40 +1,61 @@
-# Step 13: `docs/design.md` for the configurable baseline and the config module
+# Step 13: cross-layer duplicate findings
 
 ## LLM prompt
 
-Read `pr_info/steps/summary.md`, then implement this step (`pr_info/steps/step_13.md`) only. It changes documentation only, so there is no unit test; `npm run docs:lint` and `npm run check:docs` are the checks. `docs/design.md` is about 89 KB, so read and edit it section by section with `read_file` ranges and `edit_file`. Run `npm run format`, then `npm run check`, then commit with `git_commit` (explicit `paths`).
+Read `pr_info/steps/summary.md`, then implement this step (`pr_info/steps/step_13.md`) only. Write `tests/config-layers.test.ts` first (using `fakeDeps`), then extend `loadConfig` in `hooks/config.ts`. Run `npm run format`, then `npm run check`, then commit with `git_commit` (explicit `paths`).
 
 ## WHERE
 
-- `docs/design.md` (modified)
+- `hooks/config.ts` (extended)
+- `tests/config-layers.test.ts` (new)
 
 ## WHAT
 
-Edit each place below. Keep the sentences short, and name no draft numbers in user-facing text. Draft names in the design's own planning sections are fine.
+```ts
+interface Layer {
+  set: RuleSet;
+  source: Source;
+  prefix: string;
+}
+function crossLayerFindings(layers: readonly Layer[]): Issue[];
+```
 
-1. **Concepts, the "Baseline" bullet** (around line 42): the baseline is always active. The mod ships a default, which a top-level `baseline` in the user file replaces whole, with no merging. Its path asks and denies remain path guards.
-2. **"Where profiles live"** (around lines 48–58):
-   - Layer 1 becomes: the baseline is the user file's `baseline` if present, else the shipped default. Drop "cannot be overridden".
-   - The shape gains `"baseline": { "allow": [], "ask": [], "deny": [] }`.
-   - The baseline has no `description` and no `delegable`.
-   - The failure sentence becomes: an invalid config fails closed. Only an empty baseline is active (all three lists empty, never the default, so a broken setup cannot widen a baseline the user narrowed), and `startProfiles` is always `[]`. Drop "informational".
-   - Add: a `baseline` or `logDir` in a project `.mode-gate.json` is ignored with a warning.
-3. **Baseline section** (around lines 60–71):
-   - The opening says this is the shipped default.
-   - The read tools drop `github_issue_view` and list the 14 tools of `hooks/baseline.ts`.
-   - Add one sentence: `github_issue_view` is not in the default because its `body_file` writes a project file, which the path guards don't cover. It belongs to the `issues` profile.
-   - "The baseline has no ask or deny rules" becomes "The default baseline has no ask or deny rules; a user `baseline` may have them."
-4. **Code structure, the `config.ts` row** (around line 209): it imports only `baseline.ts`, `builtin-profiles.ts` and `policy.ts`. From `policy.ts` that is the types plus `decide` at runtime, for the "covers" check. The data files import nothing at runtime.
-5. **Impact on the drafts, the Draft 02 row** (around line 331): sibling imports use extensionless or `./x.js` specifiers, not `./x.ts`, because `tsconfig.json` doesn't set `allowImportingTsExtensions`.
+## HOW
 
-After editing, `search_files` on `docs/design.md` for `cannot be overridden`, `informational` and `./x.ts` must find nothing that contradicts issue #4.
+`loadConfig` builds the layers in order:
 
-## HOW / ALGORITHM / DATA
+1. The baseline in effect: `source: 'user'` if it came from the user file, else `'baseline'`. Prefix `baseline`.
+2. Each built-in whose name is not among the user profiles (`Object.hasOwn`): `source: 'builtin'`, prefix `profiles.<name>`.
+3. Each user profile: `source: 'user'`, prefix `profiles.<name>`.
 
-Not applicable: these are text edits only. Markdown tables keep their column alignment; Prettier fixes it.
+The replaced default baseline, the replaced built-ins and the proposals are not layers. Layers come from `checkFile` output, which holds only sets without errors, so the rule indexes match the original file paths. The returned warnings are added to the result's warnings.
+
+## ALGORITHM
+
+```text
+first = new Map<string, { layer: number; path: string }>()
+for each layer index n, list of ["allow", "ask", "deny"], rule at i:
+  key = list + "|" + patternKey(rule); path = `${prefix}.${list}[${i}]`
+  seen = first.get(key); if !seen -> first.set(key, { layer: n, path })
+  else if seen.layer !== n -> warning { source: layer.source, path, message: `same pattern as ${seen.path}` }
+```
+
+Same-layer repeats are skipped here, because Step 7 already reports them. Only the same list type is compared, so a deny in one profile against an allow in another never gives a finding.
+
+## DATA / test rows
+
+- An injected built-in `git-write` with `allow: ["Bash(git add *)"]` and a user profile `p` with the same rule give exactly one warning: `source: 'user'`, path `profiles.p.allow[0]`, and a message containing `same pattern as profiles.git-write.allow[0]`.
+- A user profile `git-write` that replaces the built-in and repeats its rule gives no duplicate warning.
+- A proposal that repeats a user rule gives no warning.
+- The same rule in the default baseline's allow and a built-in's allow gives a warning with `source: 'builtin'`, which names `baseline.allow[j]`.
+- A user `baseline` that replaces the default: a user profile repeating a rule of the replaced default gives no warning, while one repeating a rule of the user `baseline` does.
+- Negative rows, with no warning of any kind:
+  - a restriction profile with `deny: ["mcp__mcp-workspace__save_file"]` against a baseline that allows it;
+  - a user `deny: ["Bash(git push)"]` against another profile's `allow: ["Bash(git push)"]`.
+- `ask`/`ask` and `deny`/`deny` duplicates across two profiles each give a warning.
 
 ## Done when
 
-`npm run check` passes, including `docs:lint`.
+`npm run check` passes.
 
-Commit message: `docs(design): configurable baseline and the config module`.
+Commit message: `feat(config): report the same pattern across profiles`.

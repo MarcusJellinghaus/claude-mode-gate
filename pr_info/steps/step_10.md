@@ -1,12 +1,12 @@
-# Step 10: `loadConfig` core
+# Step 10: `loadConfig`, success path, baseline selection and merge
 
 ## LLM prompt
 
 Read `pr_info/steps/summary.md`, then implement this step (`pr_info/steps/step_10.md`) only.
 
 1. Write `tests/config-fixtures.ts` (the shared fake deps).
-2. Write `tests/config-load.test.ts`, starting with the two "How to start" rows of issue #4, then one row per case below, and watch them fail.
-3. Implement `loadConfig` in `hooks/config.ts`. Project proposals (Step 11) and cross-layer findings (Step 12) are not part of this step: `proposals` is `{}` for now.
+2. Write `tests/config.test.ts`, starting with the two "How to start" rows of issue #4, then one row per case below, and watch them fail.
+3. Implement `loadConfig` in `hooks/config.ts`. The fail-closed cases, the user `logDir`, the start profiles and the untrusted env come in Step 11. Project proposals (Step 12) and cross-layer findings (Step 13) are not part of this step either: `proposals` is `{}` for now.
 
 Run `npm run format`, then `npm run check`, then commit with `git_commit` (explicit `paths`).
 
@@ -14,7 +14,7 @@ Run `npm run format`, then `npm run check`, then commit with `git_commit` (expli
 
 - `hooks/config.ts` (extended)
 - `tests/config-fixtures.ts` (new; a helper, not a `*.test.ts`)
-- `tests/config-load.test.ts` (new)
+- `tests/config.test.ts` (new; the file issue #4's "How to start" names)
 
 ## WHAT
 
@@ -25,12 +25,12 @@ import { builtinProfiles } from "./builtin-profiles";
 interface RawRuleLists { allow?: string[]; ask?: string[]; deny?: string[] }
 interface RawProfile extends RawRuleLists { description: string; delegable?: boolean }
 
-export interface LoadDeps {
+export interface LoadDeps { // exported: tests/config-fixtures.ts imports it
   readFile: (path: string) => Promise<string | undefined>;
   env: ModeGateEnv; untrustedEnv: readonly EnvName[]; cwd: string;
   baseline?: RawRuleLists; builtins?: Record<string, RawProfile>;
 }
-export type LoadResult = /* as in summary.md */;
+type LoadResult = /* as in summary.md */; // internal: no test imports it
 export async function loadConfig(deps: LoadDeps): Promise<LoadResult>;
 
 async function readJson(readFile, path, source): Promise<{ value?: unknown; issues: Issue[] }>;
@@ -53,16 +53,19 @@ export function fakeDeps(
 - `deps.baseline` and `deps.builtins` default to the shipped data through destructuring defaults. That type-checks the data files against `RawRuleLists` and `RawProfile` and keeps them reachable for knip.
 - The default baseline is validated as `checkFile({ baseline: deps.baseline }, "baseline")`, and the built-ins as `checkFile({ profiles: deps.builtins }, "builtin")`.
 - Profile lookups use `Object.hasOwn`.
+- `buildResult` already shapes both results here, because the second "How to start" row needs `ok: false`. Step 11 tests every failure kind against it.
+- In this step `logDir` is always `joinPath(cwd, "logs")` and `startProfiles` is always `[]`. Step 11 adds the user `logDir`, `parseStartProfiles` and `trustedEnv`.
 
 ## ALGORITHM
 
 ```text
-{ env, warnings } = trustedEnv(deps.env, deps.untrustedEnv); defaults = checkFile(baseline), checkFile(builtins)
-cp = resolveConfigPath(env); if cp.path: read = readJson(cp.path, "user"); user = read.value === undefined ? none : checkFile(read.value, "user")
+defaults = checkFile(baseline), checkFile(builtins)
+cp = resolveConfigPath(deps.env); if cp.issue: issues += cp.issue
+if cp.path: read = readJson(cp.path, "user"); user = read.value === undefined ? none : checkFile(read.value, "user")
 baseline = user file has a "baseline" key ? user.baseline : defaults.baseline; profiles = { ...builtins.profiles, ...user.profiles }
-logDir = user.logDir ? (isAbsolutePath ? it : joinPath(cwd, it)) : joinPath(cwd, "logs"); start = parseStartProfiles(env)
-issues = all of the above; ok = no error; if ok: startProfiles = names with Object.hasOwn(profiles, n), else unknown-profile warning
-buildResult: ok -> { ok, config: { baseline, profiles, proposals }, configPath?, logDir, startProfiles, warnings }
+logDir = joinPath(cwd, "logs"); startProfiles = []
+issues = all of the above; ok = no error
+buildResult: ok -> { ok, config: { baseline, profiles, proposals: {} }, configPath?, logDir, startProfiles, warnings }
              !ok -> { ok, errors, baseline: { name: "baseline", allow: [], ask: [], deny: [] }, configPath?, logDir, startProfiles: [], warnings }
 ```
 
@@ -88,29 +91,8 @@ buildResult: ok -> { ok, config: { baseline, profiles, proposals }, configPath?,
   - a user file without `baseline` gives the default;
   - a user `baseline` with one allow rule gives only that rule (replaced whole).
 - **A user profile with a built-in's name** replaces it whole: the built-in's rules are gone.
-- **Fail-closed rows.** Each gives `ok: false`, an empty baseline and `startProfiles: []`, with a valid user `baseline` present where a file is read:
-  - no home folder;
-  - `untrustedEnv: ["HOME"]` with only `HOME` set;
-  - a relative `MODE_GATE_CONFIG`, which also has no `configPath` key;
-  - an unreadable file (the reader rejects);
-  - a UNC `MODE_GATE_CONFIG` (`\\srv\share\mg.json`) whose read rejects;
-  - an invalid user file;
-  - a built-in with `Edit(x)`, which gives an issue with `source: 'builtin'`;
-  - an injected default baseline with `Bash(git*)`, which puts the parse error in `errors` with `source: 'baseline'`.
-- **Failure result details:**
-  - it carries `errors`, `warnings`, `configPath` and `logDir`, with `logDir` still `/repo/logs`;
-  - `MODE_GATE_PROFILES=git-write` still gives `startProfiles: []`.
-- **`logDir`:**
-  - relative `x` gives `/repo/x`;
-  - absolute `/var/log/mg` is kept;
-  - with `cwd` `C:\repo` the default is `C:\repo\logs`.
 - **BOM:** a file starting with U+FEFF parses.
-- **Start profiles:**
-  - `MODE_GATE_PROFILES="git-write,nope"` gives `["git-write"]` plus an unknown-profile warning at `env.MODE_GATE_PROFILES`;
-  - with an invalid user file, `nope` gives no unknown-profile warning, while `Bad!` still gives its invalid-name warning.
-- **Untrusted:** `untrustedEnv: ["MODE_GATE_PROFILES"]` gives one warning and no start profiles.
-- **JSON round-trip:** `JSON.parse(JSON.stringify(r))` is `toStrictEqual(r)` for a success and a failure result.
-- **Prototype safety:** after loading a file with profiles `__proto__` (JSON text) and `constructor`, the result is `ok: false`, each error names its profile, and `({}).polluted` is `undefined`.
+- **JSON round-trip:** `JSON.parse(JSON.stringify(r))` is `toStrictEqual(r)` for a success result.
 - **Baseline `ask` and `deny` reach `decide`:** a user `baseline` with `deny: ["Bash(git push *)"]`, passed as `sets: [config.baseline]`, makes `decide` deny `git push origin`.
 - **Default deps:** one test omits `baseline` and `builtins`, so the shipped data is used. `config.baseline.allow` has 41 rules, and `profiles` has `git-write` and `issues`.
 
@@ -122,4 +104,4 @@ If the baseline row above fails because `decide` ignores the `ask` or `deny` lis
 
 `npm run check` passes, with `hooks/config.ts` at 95% or more coverage on its own.
 
-Commit message: `feat(config): load the user config with fail-closed results`.
+Commit message: `feat(config): load the user config, baseline and profiles`.

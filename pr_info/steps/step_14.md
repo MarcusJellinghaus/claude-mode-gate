@@ -1,47 +1,40 @@
-# Step 14: architecture map, `CLAUDE.md` and `CHANGELOG.md`
+# Step 14: `docs/design.md` for the configurable baseline and the config module
 
 ## LLM prompt
 
-Read `pr_info/steps/summary.md`, then implement this step (`pr_info/steps/step_14.md`) only. It changes documentation only, so there is no unit test. Then run `check_file_size` (MCP) on the repo. If a file created by this plan is over the limit, split its tests by topic (code files cannot be split: rule (b) fixes the imports of `hooks/config.ts`). Run `npm run format`, then `npm run check`, then commit with `git_commit` (explicit `paths`).
+Read `pr_info/steps/summary.md`, then implement this step (`pr_info/steps/step_14.md`) only. It changes documentation only, so there is no unit test; `npm run docs:lint` and `npm run check:docs` are the checks. `docs/design.md` is about 89 KB, so read and edit it section by section with `read_file` ranges and `edit_file`. Run `npm run format`, then `npm run check`, then commit with `git_commit` (explicit `paths`).
 
 ## WHERE
 
-- `docs/architecture/architecture.md` (modified)
-- `.claude/CLAUDE.md` (modified; not a protected file)
-- `CHANGELOG.md` (modified)
+- `docs/design.md` (modified)
 
 ## WHAT
 
-1. **`docs/architecture/architecture.md`.**
-   - The module table gains three rows:
-     - `hooks/config.ts`: config parser, validator and loader. It imports only `policy.ts` (types and `decide`), `baseline.ts` and `builtin-profiles.ts`.
-     - `hooks/baseline.ts`: the shipped default baseline, as rule strings.
-     - `hooks/builtin-profiles.ts`: the shipped profiles, as rule strings keyed by name.
-   - Add a root row for `mode-gate.schema.json`: the JSON Schema for editors.
-   - Rules gain two bullets: the data files import nothing at runtime (type imports from `policy.ts` only), and `config.ts` may import only those three modules.
-   - Add one sentence: dependency-cruiser runs with `tsPreCompilationDeps: true`, so type-only imports count.
-2. **`.claude/CLAUDE.md`.**
-   - Architecture rules gain the same two bullets.
-   - Commands:
-     - the `test:coverage` row becomes "unit tests with a 95% threshold per file on `policy.ts` and `config.ts`";
-     - the `test:mutation` row names `policy.ts` and `config.ts`.
-3. **`CHANGELOG.md`**, a new first bullet under "Unreleased":
-   - Config schema, loader and validator (`hooks/config.ts`, `mode-gate.schema.json`): user config at `MODE_GATE_CONFIG`, `$XDG_CONFIG_HOME/mode-gate/config.json` or `~/.config/mode-gate/config.json`.
-   - An optional `baseline` replaces the shipped default whole, and profiles replace built-ins by name.
-   - The project `.mode-gate.json` profiles are proposals only.
-   - Every failed load gives an empty baseline and no starting profiles.
-   - `/gate-check` findings come with severities.
-   - Coverage is enforced per file.
+Edit each place below. Keep the sentences short, and name no draft numbers in user-facing text. Draft names in the design's own planning sections are fine.
 
-README is not changed here: the loader isn't wired into any command yet, and the README is Draft 13's scope.
+1. **Concepts, the "Baseline" bullet** (around line 42): the baseline is always active. The mod ships a default, which a top-level `baseline` in the user file replaces whole, with no merging. Its path asks and denies remain path guards.
+2. **"Where profiles live"** (around lines 48–58):
+   - Layer 1 becomes: the baseline is the user file's `baseline` if present, else the shipped default. Drop "cannot be overridden".
+   - The shape gains `"baseline": { "allow": [], "ask": [], "deny": [] }`.
+   - The baseline has no `description` and no `delegable`.
+   - The failure sentence becomes: an invalid config fails closed. Only an empty baseline is active (all three lists empty, never the default, so a broken setup cannot widen a baseline the user narrowed), and `startProfiles` is always `[]`. Drop "informational".
+   - Add: a `baseline` or `logDir` in a project `.mode-gate.json` is ignored with a warning.
+3. **Baseline section** (around lines 60–71):
+   - The opening says this is the shipped default.
+   - The read tools drop `github_issue_view` and list the 14 tools of `hooks/baseline.ts`.
+   - Add one sentence: `github_issue_view` is not in the default because its `body_file` writes a project file, which the path guards don't cover. It belongs to the `issues` profile.
+   - "The baseline has no ask or deny rules" becomes "The default baseline has no ask or deny rules; a user `baseline` may have them."
+4. **Code structure, the `config.ts` row** (around line 209): it imports only `baseline.ts`, `builtin-profiles.ts` and `policy.ts`. From `policy.ts` that is the types plus `decide` at runtime, for the "covers" check. The data files import nothing at runtime.
+5. **Impact on the drafts, the Draft 02 row** (around line 331): sibling imports use extensionless or `./x.js` specifiers, not `./x.ts`, because `tsconfig.json` doesn't set `allowImportingTsExtensions`.
+
+After editing, `search_files` on `docs/design.md` for `cannot be overridden`, `informational` and `./x.ts` must find nothing that contradicts issue #4.
 
 ## HOW / ALGORITHM / DATA
 
-Not applicable: text edits only. Prettier realigns the tables.
+Not applicable: these are text edits only. Markdown tables keep their column alignment; Prettier fixes it.
 
 ## Done when
 
-- `npm run check` passes.
-- `check_file_size` reports no new file over the limit.
+`npm run check` passes, including `docs:lint`.
 
-Commit message: `docs: map the config modules and record the config schema`.
+Commit message: `docs(design): configurable baseline and the config module`.

@@ -16,20 +16,22 @@ Read `pr_info/steps/summary.md`, then implement this step (`pr_info/steps/step_4
 ## WHAT
 
 ```ts
-export type Severity = "error" | "warning";
-export type Source = "baseline" | "builtin" | "user" | "project" | "env";
-export interface Issue {
+// internal: no test imports these yet (see summary.md, "Exports")
+type Severity = "error" | "warning";
+type Source = "baseline" | "builtin" | "user" | "project" | "env";
+interface Issue {
   severity: Severity;
   source: Source;
   path: string;
   message: string;
 }
 
-export const TOP_LEVEL_KEYS = ["$schema", "logDir", "baseline", "profiles"] as const;
-export const BASELINE_KEYS = ["allow", "ask", "deny"] as const;
-export const PROFILE_KEYS = ["description", "delegable", "allow", "ask", "deny"] as const;
+// internal here; Step 5 exports them, where its test first imports them
+const TOP_LEVEL_KEYS = ["$schema", "logDir", "baseline", "profiles"] as const;
+const BASELINE_KEYS = ["allow", "ask", "deny"] as const;
+const PROFILE_KEYS = ["description", "delegable", "allow", "ask", "deny"] as const;
 
-export function isValidProfileName(name: string): boolean; // /^[a-z][a-z0-9-]*$/ and not reserved
+function isValidProfileName(name: string): boolean; // /^[a-z][a-z0-9-]*$/ and not reserved; internal (also used in Step 9)
 export function validateConfig(input: unknown, source: Source): Issue[]; // = checkFile(input, source).issues
 
 // internal, used by loadConfig later:
@@ -56,7 +58,7 @@ function checkRuleLists(
 - `IssueSink` is a small closure, `(severity, path, message) => void`, bound to `source`, which pushes onto `issues`.
 - `checkFile` checks the top-level keys and `logDir`, then the `baseline` through `checkRuleLists` with `BASELINE_KEYS` and the path prefix `baseline`.
 - Each profile goes through `checkRuleLists` with `PROFILE_KEYS` and the path prefix `profiles.<name>`, plus the `description` and `delegable` checks.
-- A profile or baseline is returned only when its own checks found no error. That keeps the rule indexes aligned with the issue paths in Step 12, and lets Step 11 use the result as the proposals directly.
+- A profile or baseline is returned only when its own checks found no error. That keeps the rule indexes aligned with the issue paths in Step 13, and lets Step 12 use the result as the proposals directly.
 - Profiles are read with `Object.keys(input.profiles)`. The name check runs before the insert: `profiles[name] = { name, description, delegable, allow, ask, deny }`.
 
 ## ALGORITHM
@@ -99,6 +101,6 @@ profiles present: must be a plain object; each name: !isValidProfileName -> erro
 
 ## Done when
 
-`npm run check` passes.
+`npm run check` passes, including `npm run deadcode`: the only new export is `validateConfig`, which the test imports.
 
 Commit message: `feat(config): validate the config file structure`.

@@ -8,6 +8,7 @@ Read `pr_info/steps/summary.md`, then implement this step (`pr_info/steps/step_5
 
 - `mode-gate.schema.json` (new, repo root)
 - `tests/config-schema.test.ts` (new)
+- `hooks/config.ts` (the three key sets become exports)
 
 ## WHAT
 
@@ -29,11 +30,12 @@ Each property gets a short `description`. The schema is a convenience for editor
 
 ## HOW
 
-The test reads the schema with `node:fs`, which is fine in tests, and compares sorted key lists:
+- In `hooks/config.ts`, add `export` to `TOP_LEVEL_KEYS`, `BASELINE_KEYS` and `PROFILE_KEYS` (internal since Step 4). This test is their first importer, so knip passes.
+- The test reads the schema with `node:fs`, which is fine in tests, and compares sorted key lists:
 
-- `Object.keys(schema.properties)` with `TOP_LEVEL_KEYS`;
-- `Object.keys(schema.$defs.baseline.properties)` with `BASELINE_KEYS`;
-- `Object.keys(schema.$defs.profile.properties)` with `PROFILE_KEYS`.
+  - `Object.keys(schema.properties)` with `TOP_LEVEL_KEYS`;
+  - `Object.keys(schema.$defs.baseline.properties)` with `BASELINE_KEYS`;
+  - `Object.keys(schema.$defs.profile.properties)` with `PROFILE_KEYS`.
 
 ## ALGORITHM
 

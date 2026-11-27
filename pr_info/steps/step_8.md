@@ -12,14 +12,15 @@ Read `pr_info/steps/summary.md`, then implement this step (`pr_info/steps/step_8
 ## WHAT
 
 ```ts
-export interface ModeGateEnv {
+// internal: the tests pass object and array literals, so no test imports these types
+interface ModeGateEnv {
   MODE_GATE_PROFILES?: string | undefined;
   MODE_GATE_CONFIG?: string | undefined;
   XDG_CONFIG_HOME?: string | undefined;
   HOME?: string | undefined;
   USERPROFILE?: string | undefined;
 }
-export type EnvName = keyof ModeGateEnv;
+type EnvName = keyof ModeGateEnv;
 const ENV_NAMES: readonly EnvName[] = [
   "MODE_GATE_PROFILES",
   "MODE_GATE_CONFIG",
@@ -50,7 +51,7 @@ isAbsolutePath: /^\//, /^[A-Za-z]:[\\/]/, /^\\\\/ -> true; else false
 joinPath: sep = base.includes("\\") ? "\\" : "/"; base ends "\\" or "/" ? base + child : base + sep + child
 resolveConfigPath: MODE_GATE_CONFIG set -> absolute ? { path } : { issue: error, source env, path env.MODE_GATE_CONFIG, "must be absolute" }
   XDG_CONFIG_HOME set and absolute -> joinPath(joinPath(xdg, "mode-gate"), "config.json")
-  home = first absolute of HOME, USERPROFILE -> joinPath(home, ".config/mode-gate/config.json") with home's separator
+  home = first absolute of HOME, USERPROFILE -> joinPath(joinPath(joinPath(home, ".config"), "mode-gate"), "config.json")
   none -> { issue: error, source "user", path "", "no home folder: set HOME or USERPROFILE" }
 ```
 

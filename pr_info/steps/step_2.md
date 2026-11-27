@@ -19,11 +19,11 @@ Read `pr_info/steps/summary.md`, then implement this step (`pr_info/steps/step_2
 
 ```ts
 import type { Rule } from "./policy";
-export type ParsedRule = { ok: true; rule: Rule } | { ok: false; message: string };
+type ParsedRule = { ok: true; rule: Rule } | { ok: false; message: string }; // internal: the test reads `.ok`, `.rule` and `.message`
 export function parseRule(raw: string): ParsedRule;
 ```
 
-Three message constants, each used for one class of rule error:
+Three exported message constants, each used for one class of rule error. The test imports them to assert the message class of each error row:
 
 - `ARG_ON_NON_BASH`: only Bash rules may take an argument; use the path guards (protected paths) for path-based protection.
 - `STAR_POSITION`: only a trailing ` *` or `:*` is supported (a subset of Claude Code's rule syntax).

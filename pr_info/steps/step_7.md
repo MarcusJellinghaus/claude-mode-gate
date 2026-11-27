@@ -18,7 +18,7 @@ Read `pr_info/steps/summary.md`, then implement this step (`pr_info/steps/step_7
 ```ts
 import { decide } from "./policy";
 
-export function patternKey(rule: Rule): string; // `${tool}|${kind}|${arg ?? ""}`; also used in Step 12
+function patternKey(rule: Rule): string; // `${tool}|${kind}|${arg ?? ""}`; internal, also used in Step 13
 export function covers(p: Rule, q: Rule): boolean; // exported for the table test
 function checkSetFindings(set: RuleSet, prefix: string, issue: IssueSink): void;
 ```
@@ -65,7 +65,7 @@ Rows through `validateConfig`:
 - `allow: ["Bash(git push:*)"]` with `deny: ["Bash(git push *)"]` is one error and no covered-allow warning.
 - `allow: ["Bash(git push)"]` with `deny: ["Bash(git push *)"]` is a covered-allow warning at `profiles.p.allow[0]`.
 - The same rows in a user `baseline`: a duplicate across `baseline.allow` and `baseline.deny` is an error, and a covered allow is a warning.
-- A deny in one profile against an allow in another profile of the same file gives no finding from this step. Cross-set findings come in Step 12 and compare only the same list type.
+- A deny in one profile against an allow in another profile of the same file gives no finding from this step. Cross-set findings come in Step 13 and compare only the same list type.
 
 ## Done when
 

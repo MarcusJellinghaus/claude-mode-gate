@@ -99,7 +99,20 @@ type LoadResult =
     };
 ```
 
-Exports are limited to what tests or later drafts use. knip flags any other export.
+## Exports
+
+Export only what a test imports at that step. knip (`npm run deadcode`) reports every other export, including an export kept for a later draft and an export used only inside `hooks/config.ts`; the later drafts add the exports they need. The types above therefore stay internal (`Severity`, `Source`, `Issue`, `ParsedRule`, `ModeGateEnv`, `EnvName`, `LoadResult`, the raw types), except `LoadDeps`, which `tests/config-fixtures.ts` imports. An internal type in an exported signature is fine: `tsconfig.json` sets `noEmit` and no `declaration`. Exports by step:
+
+| Step | Exports added                                                                     |
+| ---- | --------------------------------------------------------------------------------- |
+| 2    | `parseRule`, `ARG_ON_NON_BASH`, `STAR_POSITION`, `ARG_WHITESPACE`                 |
+| 3    | `baseline` (`hooks/baseline.ts`), `builtinProfiles` (`hooks/builtin-profiles.ts`) |
+| 4    | `validateConfig`                                                                  |
+| 5    | `TOP_LEVEL_KEYS`, `BASELINE_KEYS`, `PROFILE_KEYS`                                 |
+| 7    | `covers`                                                                          |
+| 8    | `isAbsolutePath`, `joinPath`, `trustedEnv`, `resolveConfigPath`                   |
+| 9    | `parseStartProfiles`                                                              |
+| 10   | `loadConfig`, `LoadDeps`; `fakeDeps` (`tests/config-fixtures.ts`)                 |
 
 ## Files
 
@@ -109,7 +122,7 @@ Created:
 - `hooks/baseline.ts`
 - `hooks/builtin-profiles.ts`
 - `mode-gate.schema.json`
-- `tests/config-rule.test.ts`, `tests/config-data.test.ts`, `tests/config-validate.test.ts`, `tests/config-schema.test.ts`, `tests/config-findings.test.ts`, `tests/config-paths.test.ts`, `tests/config-start-profiles.test.ts`, `tests/config-load.test.ts`, `tests/config-proposals.test.ts`, `tests/config-layers.test.ts`
+- `tests/config.test.ts` (the `loadConfig` success path, starting with issue #4's "How to start" rows), `tests/config-rule.test.ts`, `tests/config-data.test.ts`, `tests/config-validate.test.ts`, `tests/config-schema.test.ts`, `tests/config-findings.test.ts`, `tests/config-paths.test.ts`, `tests/config-start-profiles.test.ts`, `tests/config-fail.test.ts`, `tests/config-proposals.test.ts`, `tests/config-layers.test.ts`
 - `tests/config-fixtures.ts` (the shared fake `LoadDeps`; not a test file)
 
 Modified:
@@ -122,7 +135,7 @@ Modified:
 - `.claude/CLAUDE.md`
 - `CHANGELOG.md`
 
-Tests are split by topic so that each file stays under the 600-line limit.
+**Deviation from "one test file per module"** (`.claude/knowledge_base/planning_principles.md`). `hooks/config.ts` gets eleven test files instead of one, split by topic. One file would hold several hundred table rows and go well over the repo's 600-line file limit (`check_file_size`). The first `loadConfig` rows stay in `tests/config.test.ts`, as issue #4's "How to start" says. Every other file is named `tests/config-<topic>.test.ts`, so they all sort next to it.
 
 ## Steps
 
@@ -135,11 +148,12 @@ Tests are split by topic so that each file stays under the 600-line limit.
 7. Per-set findings: duplicates and covered allows (via `decide`).
 8. Path helpers, environment filter, config path resolution.
 9. `parseStartProfiles`.
-10. `loadConfig` core: user file, defaults, baseline selection, merge, result shapes.
-11. Project proposals from `.mode-gate.json`.
-12. Cross-layer duplicate findings.
-13. `docs/design.md` updates.
-14. `docs/architecture/architecture.md`, `.claude/CLAUDE.md` and `CHANGELOG.md` updates.
+10. `loadConfig`, success path: user file, defaults, baseline selection, merge, result shapes.
+11. `loadConfig`, fail-closed result: every failure kind, `logDir`, start profiles, untrusted env.
+12. Project proposals from `.mode-gate.json`.
+13. Cross-layer duplicate findings.
+14. `docs/design.md` updates.
+15. `docs/architecture/architecture.md`, `.claude/CLAUDE.md` and `CHANGELOG.md` updates.
 
 ## Rules for every step
 
@@ -147,4 +161,5 @@ Tests are split by topic so that each file stays under the 600-line limit.
 - Before the commit, run `npm run format` and then `npm run check`. Commit with `git_commit` and explicit `paths`.
 - Tests never touch the real home folder, the network or the clock. They inject the reader, the environment, `untrustedEnv` and `cwd`, and the default baseline and built-ins (except the one default-deps test).
 - Imports use extensionless specifiers, never `./x.ts`. Types are imported with `import type`.
+- Every file a step creates or changes stays under the 600-line limit. Check it with `check_file_size` (MCP) before the commit; it is not part of `npm run check`. A test file near the limit is split by topic in that same step. `hooks/config.ts` cannot be split, because rule (b) fixes its imports. If it goes over 600 lines, that step adds a `hooks/config.ts` entry to `.large-files-allowlist` and commits it with the code.
 - User-facing messages never name a draft number.
