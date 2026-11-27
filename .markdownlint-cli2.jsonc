@@ -16,7 +16,7 @@
     "coverage/**",
     ".stryker-tmp/**",
     "reports/**",
-    // mcp-coder's plan files, written by the LLM during implement.
+    // mcp-coder's LLM-written plan files and logs: rules such as MD024 and MD040, which Prettier does not fix, would turn them into check findings.
     "pr_info/**",
   ],
 }
