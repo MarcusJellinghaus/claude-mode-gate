@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 // Directory names without dots, so no `..`; nothing a shell would expand.
-const ONE_TEST_FILE = /^npm run test -- tests\/(?:[\w-]+\/)*[\w.-]+\.test\.ts$/;
+const ONE_TEST_FILE = /^npm run test -- tests\/(?:[\w-]|(?<=[\w-])\/)*[\w.-]+\.test\.ts$/;
 
 /**
  * @param {unknown} input the hook's stdin JSON

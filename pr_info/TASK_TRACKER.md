@@ -25,9 +25,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: `ONE_TEST_FILE` without nested quantifiers — [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: edge-case rows in `tests/agent-bash-guard.test.ts` (pass on today's regex), then rewrite `ONE_TEST_FILE` in `scripts/agent-bash-guard.mjs`
-- [ ] Quality checks: `npm run format`, `npm run check` — fix all issues
-- [ ] Commit message prepared: `refactor(guard): make ONE_TEST_FILE pass detect-unsafe-regex`
+- [x] Implementation: edge-case rows in `tests/agent-bash-guard.test.ts` (pass on today's regex), then rewrite `ONE_TEST_FILE` in `scripts/agent-bash-guard.mjs`
+- [x] Quality checks: `npm run format`, `npm run check` — fix all issues
+- [x] Commit message prepared: `refactor(guard): make ONE_TEST_FILE pass detect-unsafe-regex`
 
 ### Step 2: `USES` without nested quantifiers — [step_2.md](./steps/step_2.md)
 

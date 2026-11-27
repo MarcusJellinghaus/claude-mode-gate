@@ -43,12 +43,15 @@ describe("denyReason", () => {
   });
 
   describe("one test file", () => {
-    it.each(["npm run test -- tests/policy.test.ts", "npm run test -- tests/tools/x-y.test.ts"])(
-      "lets %j through when test is allowed",
-      (command) => {
-        expect(denyReason(bash(command), ["test"])).toBeUndefined();
-      },
-    );
+    it.each([
+      "npm run test -- tests/policy.test.ts",
+      "npm run test -- tests/tools/x-y.test.ts",
+      "npm run test -- tests/a/b/x.test.ts",
+      "npm run test -- tests/a.b.test.ts",
+      "npm run test -- tests/..test.ts",
+    ])("lets %j through when test is allowed", (command) => {
+      expect(denyReason(bash(command), ["test"])).toBeUndefined();
+    });
 
     it("denies it when test is not allowed", () => {
       expect(denyReason(bash("npm run test -- tests/policy.test.ts"), allowed)).toBeDefined();
@@ -62,6 +65,9 @@ describe("denyReason", () => {
       ["a flag", "npm run test -- --watch"],
       ["a chained command", "npm run test -- tests/a.test.ts && rm -rf ."],
       ["a substitution", "npm run test -- tests/$(echo a).test.ts"],
+      ["a dotted directory", "npm run test -- tests/a.b/x.test.ts"],
+      ["an empty segment", "npm run test -- tests//x.test.ts"],
+      ["an empty file stem", "npm run test -- tests/.test.ts"],
     ])("denies %s", (_name, command) => {
       expect(denyReason(bash(command), ["test"])).toMatch(/tests\/<name>\.test\.ts/);
     });
