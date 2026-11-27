@@ -6,5 +6,7 @@ reports/
 package-lock.json
 .claude/skills/
 .claude/agents/
-# mcp-coder's working files: it commits some without formatting, and the folder is deleted before merge (markdownlint skips it too).
-pr_info/
+# Review logs: mcp-coder's scoped round-log flushes commit them unformatted.
+pr_info/*_review_log_*.md
+# issue_analyse_supervisor's local log: its agents cannot run npm run format.
+pr_info/issue_analysis_log*.md

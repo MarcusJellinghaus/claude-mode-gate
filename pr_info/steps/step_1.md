@@ -37,13 +37,13 @@ pr_info/issue_analysis_log*.md
 In `.markdownlint-cli2.jsonc`, replace this line:
 
 ```jsonc
-    // mcp-coder's plan files, written by the LLM during implement.
+// mcp-coder's plan files, written by the LLM during implement.
 ```
 
 with:
 
 ```jsonc
-    // mcp-coder's LLM-written plan files and logs: rules such as MD024 and MD040, which Prettier does not fix, would turn them into check findings.
+// mcp-coder's LLM-written plan files and logs: rules such as MD024 and MD040, which Prettier does not fix, would turn them into check findings.
 ```
 
 The next line, `"pr_info/**",`, stays as it is.

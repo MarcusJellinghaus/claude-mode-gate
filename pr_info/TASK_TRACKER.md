@@ -27,9 +27,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 See [step_1.md](./steps/step_1.md).
 
-- [ ] Implementation: narrow `.prettierignore` to the two log patterns, correct the markdownlint ignore comment, add the CHANGELOG line
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared in `pr_info/.commit_message.txt`
+- [x] Implementation: narrow `.prettierignore` to the two log patterns, correct the markdownlint ignore comment, add the CHANGELOG line
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared in `pr_info/.commit_message.txt`
 
 ## Pull Request
 
