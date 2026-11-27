@@ -63,3 +63,17 @@ applied
 applied
 applied
 applied
+
+## Round 3 — 2026-11-27
+
+**Findings**:
+
+`pr_info/steps/step_7.md:28` — medium — `checkSetFindings` runs on the parsed lists, and Step 4's `checkRuleLists` drops entries that are not strings or do not parse. So in a file that already has an error, duplicate and covered-allow findings can name the wrong index (for example `allow: [123, "Bash(git push)"]` with `deny: ["Bash(git push *)"]` reports `allow[0]`, not `allow[1]`). Carry each rule's original index into `checkSetFindings`, as Step 13 already does for its layers.
+
+**Decisions**:
+
+dismiss
+
+**Changes**:
+
+dismiss
