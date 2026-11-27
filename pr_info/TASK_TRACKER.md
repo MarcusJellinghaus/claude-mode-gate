@@ -23,6 +23,31 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: `ONE_TEST_FILE` without nested quantifiers — [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: edge-case rows in `tests/agent-bash-guard.test.ts` (pass on today's regex), then rewrite `ONE_TEST_FILE` in `scripts/agent-bash-guard.mjs`
+- [ ] Quality checks: `npm run format`, `npm run check` — fix all issues
+- [ ] Commit message prepared: `refactor(guard): make ONE_TEST_FILE pass detect-unsafe-regex`
+
+### Step 2: `USES` without nested quantifiers — [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation: two edge-case tests in `tests/check-action-pins.test.ts` (pass on today's regex), then rewrite `USES` in `scripts/check-action-pins.mjs`
+- [ ] Quality checks: `npm run format`, `npm run check` — fix all issues
+- [ ] Commit message prepared: `refactor(pins): make USES pass detect-unsafe-regex`
+
+### Step 3: Suppress the remaining security findings inline — [step_3.md](./steps/step_3.md)
+
+- [ ] Implementation: one inline `eslint-disable-next-line security/<rule> -- <why>` per remaining hit reported by `npm run lint`, until 0 warnings
+- [ ] Quality checks: `npm run format`, `npm run check` — fix all issues
+- [ ] Commit message prepared: `chore(lint): justify the remaining eslint-plugin-security findings`
+
+### Step 4: Fail lint on warnings, and document it — [step_4.md](./steps/step_4.md)
+
+- [ ] Implementation: pin `lint` in `tests/check.test.ts` (fails first), set `"lint": "eslint . --max-warnings 0"` in `package.json`, update `.claude/CLAUDE.md` and `CHANGELOG.md`
+- [ ] Quality checks: `npm run format`, `npm run check` — fix all issues
+- [ ] Commit message prepared: `chore(lint): fail lint on warnings and document eslint-plugin-security`
 
 ## Pull Request
+
+- [ ] PR review: review the full branch diff against `main`
+- [ ] PR summary prepared
