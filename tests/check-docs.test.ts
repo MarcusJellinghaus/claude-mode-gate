@@ -16,6 +16,7 @@ const without = (files: Record<string, string>, ...names: string[]) =>
 function check(files: Record<string, string>, release = false) {
   return findDocProblems({
     exists: (file) => file in files,
+    // eslint-disable-next-line security/detect-object-injection -- lookup in the test's own fixture
     read: (file) => files[file] ?? "",
     release,
   });

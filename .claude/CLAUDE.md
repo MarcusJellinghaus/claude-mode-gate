@@ -91,7 +91,7 @@ Run everything with `npm run check`. It runs each gate below in order (`scripts/
 | Command                   | Gate                                                                                                                                                                                                                     |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `npm run typecheck`       | Lays the engine's types if missing (`npm run types:lay` forces it; needs Claude Code on the PATH), then `tsc --noEmit`, strict mode plus noUncheckedIndexedAccess, exactOptionalPropertyTypes and more; scripts included |
-| `npm run lint`            | ESLint, type-aware `strictTypeChecked` rules                                                                                                                                                                             |
+| `npm run lint`            | ESLint, type-aware `strictTypeChecked` rules and eslint-plugin-security's recommended rules; any warning fails                                                                                                           |
 | `npm run format:check`    | Prettier (`npm run format` fixes and lists only the files it changed)                                                                                                                                                    |
 | `npm run arch`            | dependency-cruiser architecture rules; fails when a source file is not cruised                                                                                                                                           |
 | `npm run deadcode`        | knip: unused files, exports, dependencies                                                                                                                                                                                |
@@ -123,7 +123,7 @@ The strategy is layered. Cheap, deterministic gates run first, and the security 
 5. **Mutation tests (Stryker).** Line coverage says little about a policy function. Mutation testing shows whether a flipped condition or a changed `allow`/`deny` would be caught. It runs weekly and on demand in CI.
 6. **Contract checks.** `check:manifests` validates the manifests and `check:catch` validates the fail-closed rule. `claude plugin validate` and `claude plugin test` join CI once verified, pinned to a Claude Code version, plus a weekly run against the latest.
 7. **Documentation checks.** markdownlint, a link check (lychee, CI only) and `check:docs`. A change that alters behaviour updates README.md and CHANGELOG.md in the same commit.
-8. **Security checks.** `npm audit` and gitleaks in CI. SECURITY.md is kept in step with the security model in `docs/design.md`.
+8. **Security checks.** `npm run lint` runs eslint-plugin-security's recommended rules: any warning fails, and each suppression is inline and names the rule and a reason. `npm audit` and gitleaks in CI. SECURITY.md is kept in step with the security model in `docs/design.md`.
 
 Rules for writing tests:
 

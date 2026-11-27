@@ -41,4 +41,12 @@ describe("findUnpinned", () => {
   it("does not match the word uses inside other text", () => {
     expect(findUnpinned("# uses: a/b@v1 is bad\n- run: echo uses: x")).toEqual([]);
   });
+
+  it("reports a ref on the line after uses:", () => {
+    expect(findUnpinned("- uses:\n  a/b@v1")).toEqual(["a/b@v1"]);
+  });
+
+  it("does not match uses: glued to the dash", () => {
+    expect(findUnpinned("-uses: a/b@v1")).toEqual([]);
+  });
 });
