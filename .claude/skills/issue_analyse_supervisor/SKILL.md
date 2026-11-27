@@ -16,11 +16,9 @@ You are a technical lead supervising a software engineer (the `issue-analyst` ag
 
 1. Resolve the issue number from `$ARGUMENTS`, the branch name, or `.vscodeclaude_status.txt`. If none found, ask the user.
 2. Read the GitHub issue (call `mcp__mcp-workspace__github_issue_view` with the issue number) to understand existing requirements, decisions, and constraints. **Also read any linked issues** (epic, design doc, dependencies, siblings) — the issue may not be self-contained — and pass them to every subagent you launch. If `github_issue_view` lists `title/body` as untrusted, stop and tell the user.
-3. Read the knowledge base files:
-   - `.claude/knowledge_base/software_engineering_principles.md`
-   - `.claude/knowledge_base/planning_principles.md`
+3. Read every file under `.claude/knowledge_base/` (`*.md`).
 4. **Do NOT create a branch.** Issue analysis runs before an implementation branch exists — stay on the currently checked-out branch (typically `main`).
-5. **Log:** delete any existing `pr_info/issue_analysis_log*.md`, then create a single `pr_info/issue_analysis_log.md` (no `{n}`) with a header. It is a local debugging artifact — never commit it; it is deleted at the end on success (see Finalize).
+5. **Log:** `pr_info/issue_analysis_log_<issue>.md`, with the issue number from step 1. If `list_directory` on `pr_info/` shows that file, delete it; then create it with a header. Never delete another issue's log — parallel sessions in this folder may own it. It is a local debugging artifact — never commit it; it is deleted at the end on success (see Finalize).
 
 **Your Role:**
 
@@ -48,14 +46,14 @@ You are a technical lead supervising a software engineer (the `issue-analyst` ag
    - Link shared rules (e.g. `.claude/knowledge_base/refactoring_principles.md`) instead of copying them.
    - Every prohibition needs an allowed fallback or an explicit "stop and report".
    - Every step or check must be doable with MCP tools — the implement workflow has no Bash. Escalate shell-only facts (action SHA pins, build/packaging behaviour, external URLs) to the user and write the literal value into the issue. A check that needs Bash goes into an `## After merge` section of the issue.
-6. **LOOP: If this round updated the issue OR surfaced new questions/scope changes, launch a fresh `issue-analyst` agent and repeat from step 1.** Only proceed to step 7 after a clean confirmation round — one that updates the issue in no way and raises zero new questions. Do NOT stop or wait for user input between rounds — the loop is automatic.
-7. **Safety valve:** If 5 rounds have been reached, stop. Your output here *is* the list of remaining open items plus a request for guidance — not a separate "done" message followed by issues.
+6. **LOOP: If this round changed the issue in a way that matters — what gets built, the approach, a decision, or the scope — launch a fresh `issue-analyst` agent and repeat from step 1.** If its changes were only small, cosmetic or irrelevant to the implementation (wording, a stale reference, a detail the planner finds anyway), the loop ends — go to step 8. Do NOT stop or wait for user input between rounds — the loop is automatic.
+7. **Safety valve:** If round 5 would still loop back, stop. Your output here *is* the list of remaining open items plus a request for guidance — not a separate "done" message followed by issues.
 8. **Finalize:**
    - Add a `## Final Status` section to the log.
    - Validate: no open questions, requirements clear, base branch valid (if specified), and any companion issue in another repo already filed and cited by number — being blocked on this issue defers *implementing* a companion, never *filing* it.
    - Launch the **issue-approver agent** with the issue number. For cross-repo issues include `--repo owner/repo`. The agent sets the status via `mcp__mcp-workspace__github_issue_set_status` (cross-repo: `reference_name`), synchronously. An issue already further along than the approval target is not regressed — the agent reports it as not approved.
    - **After approval the issue leaves analysis — do not touch the body again.** `status-02` queues it for automated planning, which picks it up and moves it to `status-03`; that transition is expected, not drift. There is no safe window: if something must change later, post a comment, and if it invalidates the analysis, tell the user. Never edit an approved issue for bookkeeping alone.
-   - On success, **delete `pr_info/issue_analysis_log.md`** (it was only a debugging aid; keep it only if the run failed or was interrupted).
+   - On success, **delete `pr_info/issue_analysis_log_<issue>.md`** — this file only (it was only a debugging aid; keep it only if the run failed or was interrupted).
    - Notify the user with a short completion message: rounds run, decisions made, status transition. **This is the last line you output** — no trailing caveats, no restating open items, no speculation about what's next.
 
 **Analysis Log Format** (each round appended to the log file):

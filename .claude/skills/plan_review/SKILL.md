@@ -36,4 +36,4 @@ We do not need to challenge them again unless absolutely necessary.
 - Potential risks or blockers
 - **Requirement changes** — flag new dependencies (`package.json`) that should be applied during planning, not deferred to implementation
 
-For planning standards, see `.claude/knowledge_base/planning_principles.md`.
+For planning standards, read every file under `.claude/knowledge_base/` (`*.md`).
