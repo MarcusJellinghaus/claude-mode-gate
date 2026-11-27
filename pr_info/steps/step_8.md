@@ -42,14 +42,15 @@ export function resolveConfigPath(env: ModeGateEnv): { path: string } | { issue:
 
 - `trustedEnv` copies only the five `ENV_NAMES` from `env`. It skips names in `untrusted` and empty strings, so any other key of the input object is never read.
 - It adds one warning per untrusted name: `source: 'env'`, path `env.<NAME>`, with a message saying the repo's settings set it and it is ignored.
-- `resolveConfigPath` works on the filtered env.
+- `resolveConfigPath` works on the filtered env. It also treats an empty `MODE_GATE_CONFIG` as unset itself, because its tests call it directly with raw env objects. An empty `XDG_CONFIG_HOME`, `HOME` or `USERPROFILE` is not absolute, so it falls through anyway.
 
 ## ALGORITHM
 
 ```text
 isAbsolutePath: /^\//, /^[A-Za-z]:[\\/]/, /^\\\\/ -> true; else false
 joinPath: sep = base.includes("\\") ? "\\" : "/"; base ends "\\" or "/" ? base + child : base + sep + child
-resolveConfigPath: MODE_GATE_CONFIG set -> absolute ? { path } : { issue: error, source env, path env.MODE_GATE_CONFIG, "must be absolute" }
+resolveConfigPath: MODE_GATE_CONFIG set and not "" -> absolute ? { path } : { issue: error, source env, path env.MODE_GATE_CONFIG, "must be absolute" }
+  (an empty MODE_GATE_CONFIG counts as unset and falls through)
   XDG_CONFIG_HOME set and absolute -> joinPath(joinPath(xdg, "mode-gate"), "config.json")
   home = first absolute of HOME, USERPROFILE -> joinPath(joinPath(joinPath(home, ".config"), "mode-gate"), "config.json")
   none -> { issue: error, source "user", path "", "no home folder: set HOME or USERPROFILE" }

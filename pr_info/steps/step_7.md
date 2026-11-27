@@ -30,7 +30,8 @@ function checkSetFindings(set: RuleSet, prefix: string, issue: IssueSink): void;
 ## ALGORITHM
 
 ```text
-covers(p, q): p.kind === "whole" -> p.tool === "*" || p.tool === q.tool || q.tool.startsWith(p.tool + "__")
+covers(p, q): p.kind === "whole" -> p.tool === "*" || p.tool === q.tool
+                                    || (p.tool.startsWith("mcp__") && q.tool.startsWith(p.tool + "__"))
               q.tool !== "Bash" || q.kind === "whole" -> false
               else decide({ call: { toolName: "Bash", input: { command: q.arg } },
                             sets: [{ name: "covers", allow: [], ask: [], deny: [p] }], guards: [],
@@ -40,7 +41,7 @@ checkSetFindings: first = map patternKey -> { list, i }; for each list, each rul
   for each allow rule not marked: some ask/deny rule with a different key covers it -> warning "covered by <list>[j]"
 ```
 
-`p.tool + "__"` in `covers` only matters when P is a bare server, `mcp__s`. A plain tool name never has `__` after it.
+The server-prefix branch applies only when P is an MCP name, because a bare `mcp__s` is the only whole rule `decide` matches by prefix. A plain name may contain `__` (Step 2's grammar), so `covers(Foo, Foo__bar)` must be false, as in `decide`.
 
 ## DATA / test rows
 
@@ -57,6 +58,7 @@ checkSetFindings: first = map patternKey -> { list, i }; for each list, each rul
 | `Edit`             | `Write`                        | false  |
 | `mcp__s`           | `mcp__s__t`                    | true   |
 | `mcp__s`           | `mcp__other__t`                | false  |
+| `Foo`              | `Foo__bar`                     | false  |
 | `Bash(git push *)` | `Edit`                         | false  |
 
 Rows through `validateConfig`:

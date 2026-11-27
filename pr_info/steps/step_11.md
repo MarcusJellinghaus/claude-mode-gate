@@ -40,7 +40,8 @@ else:  startProfiles = [] (buildResult already does this)
   - a relative `MODE_GATE_CONFIG`, which also has no `configPath` key;
   - an unreadable file (the reader rejects);
   - a UNC `MODE_GATE_CONFIG` (`\\srv\share\mg.json`) whose read rejects;
-  - an invalid user file;
+  - a malformed user file (unparsable JSON, for example `{ "profiles": `), which gives an error with `source: 'user'` at path `''`;
+  - a user file that parses but fails validation (`{ "profiles": { "p": { "description": "d", "allow": "x" } } }`), which gives an error at `profiles.p.allow`;
   - a built-in with `Edit(x)`, which gives an issue with `source: 'builtin'`;
   - an injected default baseline with `Bash(git*)`, which puts the parse error in `errors` with `source: 'baseline'`.
 - **Failure result details:**
