@@ -17,7 +17,7 @@ If you can't name the gap, use the MCP tool. Exempt: the approved `npm run` scri
 
 **Protected files** (`.mcp*.json`, `.claude/settings*.json`, `.mcp-file-access`): MCP refuses writes to them by design. Stop and ask the user to edit the file. A refusal is not a gap, so never fall back to native Edit, Write, Bash or PowerShell.
 
-**Scratch files** go in `.scratch/`: gitignored, and writable for MCP through its `read-write` rule in `.mcp-file-access`. Delete it when done. Only a file that must live outside the repo (the API spike's probes, issue #3) goes in the session scratchpad.
+**Scratch files** go in `.scratch/`: gitignored, and writable for MCP through its `read-write` rule in `.mcp-file-access`. Other sessions may share it: name your files by issue or topic, and delete only the files you wrote (`delete_this_file`) or a `.scratch/` subfolder you created (`delete_directory(<subfolder>, recursive=True)`), never `.scratch/` itself. The user deletes `.scratch/` and leftover `pr_info/issue_analysis_log_*.md` by hand, when no session runs in this folder. Only a file that must live outside the repo (the API spike's probes, issue #3) goes in the session scratchpad.
 
 ### Tool mapping
 
@@ -48,7 +48,7 @@ If you can't name the gap, use the MCP tool. Exempt: the approved `npm run` scri
 
 ### Scratch probes
 
-Don't assert JavaScript, TypeScript or Node behaviour you haven't run. Probe it: `save_file(".scratch/probe.mjs", …)` (or `.ts`: Node strips the types), then `node .scratch/probe.mjs`, which asks for approval. Delete `.scratch/` when done. If you reason instead of running, label the conclusion analytical.
+Don't assert JavaScript, TypeScript or Node behaviour you haven't run. Probe it: `save_file(".scratch/probe_<issue or topic>.mjs", …)` (or `.ts`: Node strips the types), then `node .scratch/probe_<issue or topic>.mjs`, which asks for approval. Delete your probe file when done (`delete_this_file`). If you reason instead of running, label the conclusion analytical.
 
 ### Git and GitHub
 
