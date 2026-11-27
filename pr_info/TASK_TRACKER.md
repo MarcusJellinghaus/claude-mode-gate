@@ -23,6 +23,15 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Prettier formats `pr_info/` except the logs
+
+See [step_1.md](./steps/step_1.md).
+
+- [ ] Implementation: narrow `.prettierignore` to the two log patterns, correct the markdownlint ignore comment, add the CHANGELOG line
+- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [ ] Commit message prepared in `pr_info/.commit_message.txt`
 
 ## Pull Request
+
+- [ ] PR review: check the branch diff against summary.md and step_1.md, and confirm CI `push-checks` is green
+- [ ] PR summary prepared
