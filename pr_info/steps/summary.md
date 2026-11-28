@@ -88,10 +88,10 @@ Modified:
 
 ## Prerequisites outside the implementer's reach
 
-Each step checks its own precondition and, if it does not hold, writes one line to `pr_info/.blocked.txt` and stops.
+Each step checks its own precondition and, if it does not hold, writes one line to `pr_info/.blocked.txt` and stops. `.blocked.txt` is not the only signal: step 1 posts an owner-request comment on issue #12 when the `.mcp-file-access` precondition fails, and again once the move is committed (asking for the install, binary check and `npm run audit`). Step 8 does the same for the end-of-PR owner checks.
 
 - Before step 1: #5 is merged and in this branch; the owner adds `read-only   /plugin/.claude-plugin/types/` to `.mcp-file-access` next to the old rule.
-- Between steps 1 and 2 (after the move commit, as the issue says): the owner runs `npm install --save-dev --save-exact @anthropic-ai/claude-code@2.1.326` (with the repo's `ignore-scripts=true`) and `node_modules\.bin\claude.cmd --version` (Windows) or `node_modules/.bin/claude --version`.
+- Between steps 1 and 2 (after the move commit, as the issue says): the owner runs `npm install --save-dev --save-exact @anthropic-ai/claude-code@2.1.326` (with the repo's `ignore-scripts=true`) and `node_modules\.bin\claude.cmd --version` (Windows) or `node_modules/.bin/claude --version`, then `npm run audit`, and reports the output.
 - Before step 5: the main session adds `Bash(npm run plugin:validate)` and `Bash(npm run plugin:test)` to `.claude/settings.json` with native Edit (owner permission quoted in the issue).
 - Before step 8: the owner deletes the old gitignored root `.claude-plugin/types/` folder and removes the old `read-only   /.claude-plugin/types/` rule.
 

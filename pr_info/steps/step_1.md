@@ -5,7 +5,14 @@ One commit: the moves and every path edit together. A rename-only commit cannot 
 ## Preconditions
 
 - `tests/policy.test.ts` exists (#5 is merged and in this branch). If not, write one line to `pr_info/.blocked.txt` and stop.
-- `.mcp-file-access` contains the rule `read-only   /plugin/.claude-plugin/types/`. If not, write one line to `pr_info/.blocked.txt` and stop. Never edit `.mcp-file-access` yourself.
+- `.mcp-file-access` contains the rule `read-only   /plugin/.claude-plugin/types/`. If not, write one line to `pr_info/.blocked.txt`, post the owner-request comment (below) and stop. Never edit `.mcp-file-access` yourself.
+
+## Owner-request comment
+
+Post it on issue #12 with `github_issue_comment`, so the owner is asked (issue: "Report to the owner ... otherwise comment on this issue"). Post each version once: skip it if `github_issue_view` already shows it.
+
+- Precondition failed: ask the owner to add `read-only   /plugin/.claude-plugin/types/` to `.mcp-file-access` next to the old rule; say step 1 is blocked and nothing is committed.
+- After the step 1 commit: say the move is committed and ask the owner to run `npm install --save-dev --save-exact @anthropic-ai/claude-code@2.1.326` (with the repo's `ignore-scripts=true`), then `node_modules\.bin\claude.cmd --version` (Windows) or `node_modules/.bin/claude --version`, and `npm run audit`, and to report the output. Step 2 is blocked until then.
 
 ## WHERE
 
@@ -100,7 +107,8 @@ main: market = load(root marketplace); stop on source problems; dir = pluginSour
 - `npm run format`, then `npm run check`. `typecheck` lays the types into `plugin/.claude-plugin/types/` with the Claude Code on the PATH (the pin comes in step 4). `npm run test` must not run `plugin/tests/smoke.test.ts`.
 - `git_commit` with `paths`: the old paths (`hooks`, `types`, `.claude-plugin/plugin.json`), `plugin`, every edited file and `.mcp-file-access`.
 - Message: `refactor(plugin): move the plugin into plugin/`
+- After the commit, post the "after the step 1 commit" owner-request comment on issue #12.
 
 ## LLM prompt
 
-> Read `pr_info/steps/summary.md` and `pr_info/steps/step_1.md`, and issue #12 for context. Implement step 1 only: check the preconditions, write the tests first and see them fail, then move the plugin into `plugin/` with `move_file` and make every path edit listed, in one commit. Follow `.claude/CLAUDE.md` (MCP tools, `npm run format` then `npm run check` before `git_commit` with `paths`). If a precondition fails, write one line to `pr_info/.blocked.txt` and stop.
+> Read `pr_info/steps/summary.md` and `pr_info/steps/step_1.md`, and issue #12 for context. Implement step 1 only: check the preconditions, write the tests first and see them fail, then move the plugin into `plugin/` with `move_file` and make every path edit listed, in one commit, then post the owner-request comment on issue #12 asking for the devDependency install, binary check and `npm run audit`. Follow `.claude/CLAUDE.md` (MCP tools, `npm run format` then `npm run check` before `git_commit` with `paths`). If a precondition fails, write one line to `pr_info/.blocked.txt`, post the owner-request comment for the `.mcp-file-access` rule if that is the failing one, and stop.

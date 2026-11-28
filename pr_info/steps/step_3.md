@@ -20,7 +20,7 @@ Tests:
 
 1. `it.each(["CLAUDE.md", ".mcp.json"])("plugin/ ships no %s", ...)`: `plugin/<name>` does not exist. This replaces "keeps CLAUDE.md under .claude/": its reason, a `CLAUDE.md` failing `validate --strict`, now applies to the plugin folder.
 2. Every `stryker.config.json` `mutate` entry is in `repoFiles()`.
-3. Every vitest `coverage.include` entry is in `repoFiles()` (import the config: `import config from "../vitest.config.ts"`).
+3. Every vitest `coverage.include` entry is in `repoFiles()` (import the config: `import config from "../vitest.config"`, no `.ts` extension: `tsconfig.json` does not set `allowImportingTsExtensions`).
 4. Every dependency-cruiser rule path matches at least one tracked file: load `.dependency-cruiser.cjs` with `createRequire(import.meta.url)`; for each rule, for `from` and `to`, if `path` is a string, some file in `repoFiles()` matches `new RegExp(path)`. Rules or sides without a `path` (`circular`, `dependencyTypes`, empty `from`) are skipped. Name the rule in the failure message.
 
 ## ALGORITHM

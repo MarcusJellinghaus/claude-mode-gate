@@ -71,6 +71,7 @@ Replace the `exists`-based cases:
 
 ## Checks and commit
 
+- Run `npm run types:lay` once (it forces a lay) and confirm it prints `lay-types: ok (2.1.326)`. The types laid in step 1 already match the pin, so `typecheck` alone would not start the pinned binary through `runClaude`.
 - `npm run format`, then `npm run check`. `typecheck` prints `lay-types: ok (2.1.326)`.
 - `CHANGELOG.md`: `npm run typecheck` and `types:lay` lay the types with the pinned Claude Code, print its version and fail with "run `npm ci`" when the laid types differ from the pin; CI no longer installs Claude Code globally; the supported version is the pin.
 - `git_commit` with `paths`: `scripts/lay-types.mjs`, `tests/lay-types.test.ts`, `.github/workflows/ci.yml`, `mcp-coder.toml`, `.claude/CLAUDE.md`, `docs/design.md`, `CHANGELOG.md`.
