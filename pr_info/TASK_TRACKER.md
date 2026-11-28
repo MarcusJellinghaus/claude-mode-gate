@@ -109,9 +109,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 15: architecture map, `CLAUDE.md` and `CHANGELOG.md` ([step_15.md](./steps/step_15.md))
 
-- [ ] Implementation: `docs/architecture/architecture.md`, `.claude/CLAUDE.md`, `CHANGELOG.md`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `docs/architecture/architecture.md`, `.claude/CLAUDE.md`, `CHANGELOG.md`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 
