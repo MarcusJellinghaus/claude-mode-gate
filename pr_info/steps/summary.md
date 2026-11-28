@@ -33,9 +33,9 @@ A load failure of the hooks module leaves every call ungated (`docs/design.md`, 
 
 6. **`check:manifests` follows the marketplace source.** The marketplace lists exactly one plugin; its `source` must hold `.claude-plugin/plugin.json`, and `plugin.json` and `hooks/hooks.json` are read from there (no fixed `plugin/...` paths).
 
-7. **Config paths stay live.** A repo-structure test fails when a Stryker `mutate` entry, a vitest `coverage.include` entry or a dependency-cruiser rule path points at nothing, and when `plugin/` holds a dev file (`CLAUDE.md`, `.mcp.json`).
+7. **Config paths stay live.** A repo-structure test fails when a Stryker `mutate` entry, a vitest `coverage.include` entry or a dependency-cruiser rule path points at no tracked file, and when `plugin/` holds a dev file (`CLAUDE.md`, `.mcp.json`).
 
-8. **Dependabot** gives Claude Code its own PR (`exclude-patterns`) and holds every npm update for 5 days (`cooldown`).
+8. **Dependabot** gives Claude Code its own PR (`exclude-patterns`) and holds every npm update for 5 days (`cooldown`; left out and reported to the owner if unsupported for npm).
 
 9. **Launcher warning.** `claude.bat` and `claude.sh` warn, without stopping, when the binary they start differs from the pin.
 
@@ -44,7 +44,7 @@ A load failure of the hooks module leaves every call ungated (`docs/design.md`, 
 - Every path-carrying config is edited once, in step 1. The kit smoke test lands there too, so `plugin/tests` holds a file the first time a config names it.
 - `lay-types.mjs` has one check (laid version equals pin); a missing file is just "no version".
 - `check:manifests` requires exactly one marketplace plugin, so there is no lookup by name.
-- The config-paths test uses a small file walker, not `fs.globSync`.
+- The config-paths test lists tracked files with `git ls-files`, not a file walker or `fs.globSync`.
 - No extension of the dependency-cruiser rule to `plugin/tests` (optional in the issue, no present need).
 - The launchers read the pin with `node -p`, so batch and sh parse no JSON.
 - CI keeps its `types` matrix flag; only the install line changes.
@@ -78,24 +78,26 @@ Modified:
 ## Steps
 
 1. Move the plugin into `plugin/` (all path edits, kit smoke test, `check:manifests` follows the source).
-2. Config-paths and "no dev files in `plugin/`" repo-structure tests.
-3. Pin Claude Code as an exact devDependency and add `scripts/claude.mjs`.
+2. Pin Claude Code as an exact devDependency and add `scripts/claude.mjs` (straight after the move, so no commit sees the devDependency unused).
+3. Config-paths and "no dev files in `plugin/`" repo-structure tests.
 4. Lay the engine types with the pinned Claude Code; drop the global CI install.
 5. Add the `plugin:validate` and `plugin:test` gates everywhere.
 6. Dependabot: own PR for Claude Code, 5-day cooldown.
 7. Launcher version warning.
-8. Commit the removal of the old `.mcp-file-access` types rule.
+8. Post the owner steps on issue #12, then commit the removal of the old `.mcp-file-access` types rule.
 
 ## Prerequisites outside the implementer's reach
 
 Each step checks its own precondition and, if it does not hold, writes one line to `pr_info/.blocked.txt` and stops.
 
 - Before step 1: #5 is merged and in this branch; the owner adds `read-only   /plugin/.claude-plugin/types/` to `.mcp-file-access` next to the old rule.
-- Between steps 2 and 3: the owner runs `npm install --save-dev --save-exact @anthropic-ai/claude-code@2.1.326` (with the repo's `ignore-scripts=true`) and `node_modules\.bin\claude.cmd --version` (Windows) or `node_modules/.bin/claude --version`.
+- Between steps 1 and 2 (after the move commit, as the issue says): the owner runs `npm install --save-dev --save-exact @anthropic-ai/claude-code@2.1.326` (with the repo's `ignore-scripts=true`) and `node_modules\.bin\claude.cmd --version` (Windows) or `node_modules/.bin/claude --version`.
 - Before step 5: the main session adds `Bash(npm run plugin:validate)` and `Bash(npm run plugin:test)` to `.claude/settings.json` with native Edit (owner permission quoted in the issue).
 - Before step 8: the owner deletes the old gitignored root `.claude-plugin/types/` folder and removes the old `read-only   /.claude-plugin/types/` rule.
 
 ## Owner checks after the last step
+
+Step 8 posts these as a comment on issue #12.
 
 - The launcher warning, by hand, in `claude.bat` and `claude.sh`.
 - On Windows, `npm run plugin:validate` runs the pinned binary, not `claude.bat`.

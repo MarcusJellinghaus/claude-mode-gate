@@ -27,7 +27,7 @@ One commit: the moves and every path edit together. A rename-only commit cannot 
 2. `tests/tsconfig.test.ts`:
    - `typeRoots` contains `./plugin/.claude-plugin/types`;
    - `include` contains `plugin/hooks`, `plugin/types`, `plugin/tests` and `tests`, and never `plugin` itself (it would pull in the laid `.d.ts` files).
-3. `tests/repo-structure.test.ts`: change every path to the new layout (`plugin/hooks/policy.ts`, `plugin/hooks/hooks.json`, `plugin/hooks/register.ts`, `plugin/.claude-plugin/plugin.json`). Keep the `CLAUDE.md` test as is; step 2 retargets it.
+3. `tests/repo-structure.test.ts`: change every path to the new layout (`plugin/hooks/policy.ts`, `plugin/hooks/hooks.json`, `plugin/hooks/register.ts`, `plugin/.claude-plugin/plugin.json`). Keep the `CLAUDE.md` test as is; step 3 retargets it.
 
 Run `npm run test` and see the new tests fail.
 

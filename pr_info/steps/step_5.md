@@ -50,7 +50,7 @@ Run `npm run test` and see test 1 fail. Test 2 passes from the start: check it f
   - Commands table: rows for `npm run plugin:validate` (`claude plugin validate plugin --strict` with the pinned Claude Code) and `npm run plugin:test` (kit tests in `plugin/tests/`, in the engine's sandbox).
   - Testing strategy item 6: `claude plugin validate --strict` and `claude plugin test` run on `plugin/` in `npm run check` and CI, with the Claude Code version pinned in `package.json`; drop "join CI once verified" and "plus a weekly run against the latest" (Dependabot replaces it).
   - Agent Bash guard paragraph: no change needed unless it lists gate names.
-- `docs/design.md` "Impact on the drafts", row 10: `claude plugin validate --strict` and `claude plugin test` run on `plugin/` only; on the repo root `--strict` failed from 2.1.326 on, because the engine type-checked and ran the vitest files.
+- `docs/design.md` "Impact on the drafts", row 10: `claude plugin validate --strict` and `claude plugin test` run on `plugin/` only; on the repo root `--strict` passed on 2.1.292 and fails on 2.1.326, because the engine type-checks and runs the vitest files.
 
 ## Verify
 

@@ -2,9 +2,10 @@
 
 One commit. A red CI run on a Claude Code bump is then clearly Claude Code's, and only versions out for 5 days are proposed.
 
-## Precondition
+## Key check
 
-- Confirm with `WebFetch` on GitHub's Dependabot options reference (docs.github.com, "Dependabot options reference") that `cooldown` with `default-days` is supported for the `npm` ecosystem, and that `exclude-patterns` is a `groups` key. If `cooldown` is not supported for npm, write one line to `pr_info/.blocked.txt` and stop (the owner decides whether to leave it out).
+- Confirm with `WebFetch` on GitHub's Dependabot options reference (docs.github.com, "Dependabot options reference") that `cooldown` with `default-days` is supported for the `npm` ecosystem, and that `exclude-patterns` is a `groups` key.
+- If `cooldown` is not supported for npm (as the issue decides): leave the `cooldown` key out, still make and commit the `exclude-patterns` change, drop the cooldown half of the CHANGELOG line, and report the gap to the owner with `github_issue_comment` on issue #12 (one sentence: `cooldown` is unsupported for npm Dependabot updates, so it was left out).
 
 ## WHERE
 
@@ -48,4 +49,4 @@ None.
 
 ## LLM prompt
 
-> Read `pr_info/steps/summary.md` and `pr_info/steps/step_6.md`. Implement step 6 only: confirm the `cooldown` and `exclude-patterns` keys in GitHub's docs, then edit `.github/dependabot.yml` and the CHANGELOG. Follow `.claude/CLAUDE.md` (MCP tools, `npm run format` then `npm run check` before `git_commit` with `paths`). If `cooldown` is unsupported for npm, write one line to `pr_info/.blocked.txt` and stop.
+> Read `pr_info/steps/summary.md` and `pr_info/steps/step_6.md`. Implement step 6 only: confirm the `cooldown` and `exclude-patterns` keys in GitHub's docs, then edit `.github/dependabot.yml` and the CHANGELOG. Follow `.claude/CLAUDE.md` (MCP tools, `npm run format` then `npm run check` before `git_commit` with `paths`). If `cooldown` is unsupported for npm, leave it out, commit the `exclude-patterns` change and report the gap in a comment on issue #12.
