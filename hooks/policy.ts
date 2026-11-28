@@ -99,8 +99,19 @@ function core(input: DecideInput, chain: ChainEntry[] | undefined): Decision {
   }
   return (
     walk("ask", input, name, chain) ??
-    walk("allow", input, name, chain) ??
+    allowWalk(input, name, chain) ??
     fromClaude(claude, claude.decision)
+  );
+}
+
+const PROTECTED_ASK = "Claude Code ask from a setting, hook or plugin";
+
+// An ask from a setting, hook or plugin is a boundary set outside this mod, so no
+// allow rule lifts it. An empty string still names its origin.
+function isProtectedAsk(claude: ClaudeVerdict): boolean {
+  return (
+    claude.decision === "ask" &&
+    (claude.setting !== undefined || claude.hook !== undefined || claude.plugin !== undefined)
   );
 }
 
@@ -121,10 +132,10 @@ function fromClaude(claude: ClaudeVerdict, verdict: Verdict): Decision {
   };
 }
 
-function rulesOf(set: RuleSet, cls: Verdict): Rule[] {
+type BlockingClass = "deny" | "ask";
+
+function rulesOf(set: RuleSet, cls: BlockingClass): Rule[] {
   switch (cls) {
-    case "allow":
-      return set.allow;
     case "ask":
       return set.ask;
     case "deny":
@@ -134,7 +145,7 @@ function rulesOf(set: RuleSet, cls: Verdict): Rule[] {
 
 // Guard results come first in their class walk; a deny guard is the issue's step 2.
 function walk(
-  cls: Verdict,
+  cls: BlockingClass,
   input: DecideInput,
   name: string | undefined,
   chain: ChainEntry[] | undefined,
@@ -151,6 +162,29 @@ function walk(
         chain?.push({ step: 3, cls, text: rule.raw, profile: set.name });
         return { verdict: cls, source: "rule", rule: rule.raw, profile: set.name };
       }
+    }
+  }
+  return undefined;
+}
+
+// Under a protected ask every matching allow rule is recorded as skipped, so the chain shows
+// what would have allowed the call; core then passes Claude Code's ask through.
+function allowWalk(
+  input: DecideInput,
+  name: string | undefined,
+  chain: ChainEntry[] | undefined,
+): Decision | undefined {
+  const protectedAsk = isProtectedAsk(input.claude);
+  for (const set of input.sets) {
+    for (const rule of set.allow) {
+      if (!wholeMatches(rule, name, "allow")) continue;
+      const entry: ChainEntry = { step: 3, cls: "allow", text: rule.raw, profile: set.name };
+      if (protectedAsk) {
+        chain?.push({ ...entry, skipped: PROTECTED_ASK });
+        continue;
+      }
+      chain?.push(entry);
+      return { verdict: "allow", source: "rule", rule: rule.raw, profile: set.name };
     }
   }
   return undefined;

@@ -373,6 +373,80 @@ const GUARD_ROWS: Row[] = [
   },
 ];
 
+const PROTECTED_REASON = "outside the working directory";
+const ALLOW_SRV_A = set("baseline", { allow: [whole("mcp__srv__a")] });
+const protectedAsk = (field: "setting" | "hook" | "plugin", value: string): ClaudeVerdict => ({
+  decision: "ask",
+  reason: PROTECTED_REASON,
+  [field]: value,
+});
+const SETTING_ASK = protectedAsk("setting", "blockReadsOutsideWorkingDirectories");
+const PROTECTED_DECISION: Decision = {
+  verdict: "ask",
+  source: "claude-code",
+  message: PROTECTED_REASON,
+};
+
+const PROTECTED_ASK_ROWS: Row[] = [
+  ...(
+    [
+      ["setting", "blockReadsOutsideWorkingDirectories"],
+      ["hook", "pre-tool-hook"],
+      ["plugin", "some-plugin"],
+    ] as const
+  ).map(([field, value]): Row => ({
+    name: `an allow rule does not override a Claude Code ask carrying ${field}`,
+    input: input(call("mcp__srv__a"), [ALLOW_SRV_A], protectedAsk(field, value)),
+    expected: PROTECTED_DECISION,
+  })),
+  {
+    name: "a protected Claude Code ask carries Claude Code's rule",
+    input: input(call("mcp__srv__a"), [ALLOW_SRV_A], { ...SETTING_ASK, rule: "Read(/etc/**)" }),
+    expected: { ...PROTECTED_DECISION, rule: "Read(/etc/**)" },
+  },
+  {
+    name: "an empty setting still protects a Claude Code ask",
+    input: input(call("mcp__srv__a"), [ALLOW_SRV_A], protectedAsk("setting", "")),
+    expected: PROTECTED_DECISION,
+  },
+  {
+    name: "an allow rule overrides a Claude Code ask without setting, hook or plugin",
+    input: input(call("mcp__srv__a"), [ALLOW_SRV_A], { decision: "ask", reason: PROTECTED_REASON }),
+    expected: ruleDecision("allow", "mcp__srv__a"),
+  },
+  {
+    name: "a deny rule beats a protected Claude Code ask",
+    input: input(
+      call("mcp__srv__a"),
+      [set("baseline", { allow: [whole("mcp__srv__a")], deny: [whole("mcp__srv__a")] })],
+      SETTING_ASK,
+    ),
+    expected: ruleDecision("deny", "mcp__srv__a"),
+  },
+  {
+    name: "a deny guard result beats a protected Claude Code ask",
+    input: input(call("mcp__srv__a"), [ALLOW_SRV_A], SETTING_ASK, [denyGuard("protected path")]),
+    expected: guardDecision("deny", "protected path"),
+  },
+  {
+    name: "an ask rule asks under a protected Claude Code ask",
+    input: input(
+      call("mcp__srv__a"),
+      [set("baseline", { allow: [whole("mcp__srv__a")], ask: [whole("mcp__srv__a")] })],
+      SETTING_ASK,
+    ),
+    expected: ruleDecision("ask", "mcp__srv__a"),
+  },
+  {
+    name: "a setting on a Claude Code allow does not block an allow rule",
+    input: input(call("mcp__srv__a"), [ALLOW_SRV_A], {
+      decision: "allow",
+      setting: "blockReadsOutsideWorkingDirectories",
+    }),
+    expected: ruleDecision("allow", "mcp__srv__a"),
+  },
+];
+
 const ROWS: Row[] = [
   ...CORE_ROWS,
   ...WHOLE_TOOL_ROWS,
@@ -381,7 +455,10 @@ const ROWS: Row[] = [
   ...UNKNOWN_DECISION_ROWS,
   ...UNUSABLE_NAME_ROWS,
   ...GUARD_ROWS,
+  ...PROTECTED_ASK_ROWS,
 ];
+
+const PROTECTED_SKIP = "Claude Code ask from a setting, hook or plugin";
 
 const CHAIN_ROWS: ChainRow[] = [
   {
@@ -435,6 +512,37 @@ const CHAIN_ROWS: ChainRow[] = [
     name: "an ask guard result on a call with no tool name",
     input: input({ input: {} }, [set("baseline")], ALLOW, [askGuard("check this path")]),
     chain: [],
+  },
+  {
+    name: "an allow rule skipped under a protected Claude Code ask",
+    input: input(call("mcp__srv__a"), [ALLOW_SRV_A], SETTING_ASK),
+    chain: [
+      {
+        step: 3,
+        cls: "allow",
+        text: "mcp__srv__a",
+        profile: "baseline",
+        skipped: PROTECTED_SKIP,
+      },
+    ],
+  },
+  {
+    name: "two allow rules in two sets skipped under a protected Claude Code ask",
+    input: input(
+      call("mcp__srv__a"),
+      [ALLOW_SRV_A, set("git-write", { allow: [whole("mcp__srv")] })],
+      SETTING_ASK,
+    ),
+    chain: [
+      {
+        step: 3,
+        cls: "allow",
+        text: "mcp__srv__a",
+        profile: "baseline",
+        skipped: PROTECTED_SKIP,
+      },
+      { step: 3, cls: "allow", text: "mcp__srv", profile: "git-write", skipped: PROTECTED_SKIP },
+    ],
   },
 ];
 
