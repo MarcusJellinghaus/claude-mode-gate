@@ -92,6 +92,8 @@ const WHOLE_TOOL_ROWS: Row[] = [
   allowCase("mcp__srv__a", "mcp__srv__ab", false),
   allowCase("Skill", "Skill", true),
   allowCase("Skill", "SkillX", false),
+  allowCase("Skill", "Skill__x", false),
+  denyCase("Edit", "Edit__x", false),
   allowCase("*", "Read", true),
   allowCase("*", "mcp__srv__a", true),
   allowCase("*", "Bash", true, { command: "ls" }),
@@ -229,6 +231,11 @@ const UNUSABLE_NAME_ROWS: Row[] = [
   {
     name: "deny Bash does not deny a call with no tool name",
     input: input({ input: {} }, [set("baseline", { deny: [whole("Bash")] })]),
+    expected: MALFORMED,
+  },
+  {
+    name: "deny mcp__srv does not deny a call with no tool name",
+    input: input({ input: {} }, [set("baseline", { deny: [whole("mcp__srv")] })]),
     expected: MALFORMED,
   },
 ];
