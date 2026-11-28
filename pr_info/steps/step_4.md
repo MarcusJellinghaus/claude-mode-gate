@@ -68,7 +68,7 @@ Allow side (strict):
 - Odd spacing under allow `prefix("git commit ")`: ` git commit -m x`, `git  commit -m x`, `git\tcommit -m x` → downgrade; `git commit -m x` → `allow`.
 - Verbatim prefix: allow `prefix("gh issue edit ")` matches `gh issue edit 1`, not `gh issue editor 1` or `gh issue edit` (downgrade); allow `prefix("git status ", "Bash(git status:*)")` matches `git status -s`, not `git statusx`.
 - Never substring: allow `prefix("git status ")` and allow exact `npm run check` do not match `x; git status` or `x; npm run check`; nor `echo git status -s` and `x npm run check` (downgrade).
-- Literal space only: allow `prefix("git status ")` does not match `git status -s` (downgrade).
+- Literal space only: allow `prefix("git status ")` does not match `"git\u00A0status -s"` (downgrade).
 - Whole-tool rules ignore metacharacters: against `a && b`, allow `Bash` and allow `*` → `allow`; allow `prefix("")` (`Bash(*)`) → downgrade.
 - Allow `mcp__srv` does not match a `Bash` call (downgrade).
 - Unmatched Bash: Claude Code `allow` with a `reason` and `rule` for `npm install` and for `npm ci` → downgrade, no `rule`/`message` keys; Claude Code `ask` for `npm install` → `ask`, `claude-code`.
@@ -81,7 +81,7 @@ Deny and ask side (boundary-checked):
 - `ask prefix("git push ")` asks (`source` `rule`) for `x; git push`, `x && git push origin`, `x; git push\torigin`; whole-tool ask `Bash` and ask `*` ask for `x; git push`.
 - `deny exact("rm -rf /")` fires on `rm -rf /`, `rm -rf / b`, `a; rm -rf /`, `a && rm -rf / b`; not on `rm -rf /tmp`, `a; rm -rf /tmp`, `a; xrm -rf /`; `ask exact("rm -rf /")` asks for `a; rm -rf /`.
 - `:*`: `deny prefix("git push ", "Bash(git push:*)")` fires on `git push`, `x; git push origin`, not on `git pushd`; `deny prefix("npm run check ", "Bash(npm run check:*)")` fires on `npm run check`, `x; npm run check -x`, not on `x; npm run check:docs`; `deny exact("npm run check:docs")` fires on `a; npm run check:docs`, not on `npm run check`.
-- `\s`: `deny prefix("git push ")` fires on `x\rgit push`, `x git push`, `git push origin`, `x\tgit push`.
+- `\s`: `deny prefix("git push ")` fires on `x\rgit push`, `"x\u00A0git push"`, `"git push\u00A0origin"`, `x\tgit push`.
 - No regex: `deny prefix("grep a.b ")` fires on `grep a.b f`, not on `grep aXb f`; `deny prefix("echo (x) ")` fires on `echo (x) y`; `deny prefix("echo a+b ")`, `prefix("echo [a] ")`, `prefix("echo ^a$ ")` fire on `echo a+b x`, `echo [a] x`, `echo ^a$ x`; the first two do not fire on `echo aab x`, `echo a x`.
 - Empty rule text: `deny prefix("")` and `ask prefix("")` match `x; git push`, `git status` and `ls`.
 - Known bypasses, each a downgrade (never `allow`): `deny prefix("git push ")` against `bash -c "git push"`, `sh -c 'git push'`, `/usr/bin/git push`, `\\git push`, `git  push`, `git -C . push`; `deny exact("rm -rf /")` against `rm -rf /*`.

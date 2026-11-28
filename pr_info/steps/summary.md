@@ -106,7 +106,7 @@ export function decide(input: DecideInput): Decision;
 - `eslint-plugin-security` (`detect-object-injection`) flags `obj[variable]`: iterate with `for…of`, pick rule lists with a selector function (`(s: RuleSet) => s.deny`), never `set[cls]`; scan strings with `indexOf`, `includes`, `startsWith` and `charAt`.
 - Comments in `hooks/policy.ts` must not contain `$.state`, `$.store`, `$.ui`, `$.on`, or a line starting with `import`.
 - Tests import extensionless: `import { decide, … } from "../hooks/policy";` (type imports with `import type`).
-- Write NBSP, CR and tab in tests as escapes (` `, `\r`, `\t`).
+- Write NBSP, CR and tab in tests as escapes (`\u00A0`, `\r`, `\t`).
 - Every gate runs through `npm run <script>`: `npm run format`, then `npm run check`, then `git_commit` with `paths`. `npm run test:mutation` is not run by the implementer.
 
 ## Test layout

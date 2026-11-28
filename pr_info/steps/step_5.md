@@ -47,6 +47,7 @@ A subagent call carries `agentId: "a1"` unless stated. Claude Code `allow` unles
 
 - Subagent `git status` with no allow rule → `{ verdict: "deny", source: "subagent-bash" }`; the same call without `agentId` → downgrade.
 - `agentId: ""` counts as a subagent call → `subagent-bash`.
+- Order of steps 1 and 2: subagent `git status` with no allow rule and a `deny` guard result → `{ verdict: "deny", source: "subagent-bash" }`, not `guard`.
 - Held: subagent `npm run check` under allow exact `npm run check` → `allow`, `rule`; under allow `Bash` → `allow`.
 - Ask or deny rules do not hold: subagent `git push` whose only matching rule is ask `prefix("git push ")` → `subagent-bash`; only deny `prefix("git push ")` → `subagent-bash`.
 - Held, then denied by a rule: subagent `git push` under allow `Bash` and deny `prefix("git push ")` → `deny`, `rule`.
