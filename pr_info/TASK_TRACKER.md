@@ -103,9 +103,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 14: `docs/design.md` for the configurable baseline and the config module ([step_14.md](./steps/step_14.md))
 
-- [ ] Implementation: the five edits to `docs/design.md`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: the five edits to `docs/design.md`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 15: architecture map, `CLAUDE.md` and `CHANGELOG.md` ([step_15.md](./steps/step_15.md))
 
