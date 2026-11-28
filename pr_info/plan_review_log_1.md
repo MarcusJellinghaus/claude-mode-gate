@@ -28,3 +28,27 @@ applied
 applied
 applied
 applied
+
+## Round 2 — 2026-11-28
+
+**Findings**:
+
+pr_info/steps/step_3.md:23 — medium — `import config from "../vitest.config.ts"` will likely fail `npm run typecheck` with TS5097. `tsconfig.json` has no `allowImportingTsExtensions`, and no existing test imports a path ending in `.ts` (they import `.mjs`, with `moduleResolution: Bundler`). Use `import config from "../vitest.config"` (analytical).
+pr_info/steps/summary.md:91 — medium — The only signal for the mid-PR owner steps is a line in `pr_info/.blocked.txt`. These are the new `.mcp-file-access` rule before step 1 and the devDependency install, binary check and `npm run audit` after the move commit. The issue says to report "in the session chat if one is attached, otherwise comment on this issue", and an acceptance criterion requires that "the owner was asked" for both. Fix: when step 1's precondition fails, or once step 1 is committed, post a comment on #12 that asks for the install and the probe output. Step 8 already does this for the end-of-PR steps.
+pr_info/steps/step_4.md:74 — low — Locally the types laid in step 1 already match the pin, so `npm run typecheck` in step 4 lays nothing and never starts the pinned binary through `runClaude` on Windows. Step 2 (line 66) claims that step 4 runs it for real. Fix: have step 4 run `npm run types:lay` once (it forces a lay and is pre-approved) and confirm it prints `lay-types: ok (2.1.326)`.
+pr_info/steps/step_2.md:51 — low — knip may not recognise the inline `createRequire(import.meta.url).resolve("@anthropic-ai/claude-code/package.json")` as a use of the package. It would then report the devDependency as unused and hit the stop at line 72. Bind it to a variable as `const require = createRequire(import.meta.url); require.resolve(...)`, or use `import.meta.resolve(...)`, which knip is more likely to detect (analytical).
+
+**Decisions**:
+
+tasks
+
+- pr_info/steps/step_3.md:23 — Change the import to `import config from "../vitest.config"` (no `.ts` extension). `tsconfig.json` does not set `allowImportingTsExtensions`, so the `.ts` path would fail `npm run typecheck` with TS5097.
+- pr_info/steps/summary.md:91 — Report the mid-PR owner steps as the issue requires: the new `.mcp-file-access` rule before step 1, then the devDependency install, binary check and `npm run audit` after the move commit. In step 1, add a task to post a comment on #12 asking for these, both when step 1's precondition fails and once step 1 is committed, as step 8 does for the end-of-PR steps. `pr_info/.blocked.txt` stays, but it is no longer the only signal. Update summary.md to match.
+- pr_info/steps/step_4.md:74 — Add a task to step 4 to run `npm run types:lay` once and confirm it prints `lay-types: ok (2.1.326)`. This makes step 4 really start the pinned binary through `runClaude` on Windows, as step_2.md:66 claims.
+
+**Changes**:
+
+applied
+applied
+applied
+applied
