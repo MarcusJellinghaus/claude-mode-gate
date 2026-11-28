@@ -55,9 +55,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 6: Boy Scout docs — [step_6.md](./steps/step_6.md)
 
-- [ ] Implementation (documentation edits in `.claude/CLAUDE.md` and `docs/design.md`)
-- [ ] Quality checks — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (documentation edits in `.claude/CLAUDE.md` and `docs/design.md`)
+- [x] Quality checks — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 
