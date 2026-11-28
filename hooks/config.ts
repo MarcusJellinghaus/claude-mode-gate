@@ -338,7 +338,8 @@ function findCover(q: Rule, lists: RuleLists): string | undefined {
 }
 
 // A pattern in two lists is an error; an allow it concerns gets no covered warning on top.
-function checkSetFindings(lists: RuleLists, prefix: string, issue: IssueSink): void {
+// Returns false on that error, so the set is left out like any other invalid one.
+function checkSetFindings(lists: RuleLists, prefix: string, issue: IssueSink): boolean {
   const first = new Map<string, { list: ListName; at: string }>();
   const inTwoLists = new Set<string>();
   for (const [list, rules] of listEntries(lists)) {
@@ -361,6 +362,7 @@ function checkSetFindings(lists: RuleLists, prefix: string, issue: IssueSink): v
     if (cover !== undefined)
       issue("warning", `${prefix}.allow[${String(i)}]`, `covered by ${cover}`);
   }
+  return inTwoLists.size === 0;
 }
 
 function checkRuleLists(
@@ -380,8 +382,8 @@ function checkRuleLists(
   const deny = checkList(rawDeny, prefix, "deny", issue);
   if (!allow || !ask || !deny) return undefined;
   const lists = { allow, ask, deny };
-  checkSetFindings(lists, prefix, issue);
-  return keysOk ? lists : undefined;
+  const setOk = checkSetFindings(lists, prefix, issue);
+  return keysOk && setOk ? lists : undefined;
 }
 
 function checkLogDir(raw: unknown, issue: IssueSink): string | undefined {

@@ -121,6 +121,22 @@ describe("loadConfig: project proposals", () => {
     );
   });
 
+  it("leaves out a proposal with the same pattern in two lists", async () => {
+    const project = JSON.stringify({
+      profiles: { q: { description: "d", allow: ["Read"], deny: ["Read"] } },
+    });
+    const result = await loadOk(withProject(project));
+    expect(Object.hasOwn(result.config.proposals, "q")).toBe(false);
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({
+        severity: "warning",
+        source: "project",
+        path: "profiles.q.deny[0]",
+        message: "duplicate of allow[0]",
+      }),
+    );
+  });
+
   it("does not start a profile that exists only as a proposal", async () => {
     const project = JSON.stringify({ profiles: { p: { description: "d" } } });
     const env = { MODE_GATE_CONFIG: USER_CONFIG, MODE_GATE_PROFILES: "p" };

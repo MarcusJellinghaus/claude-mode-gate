@@ -50,14 +50,14 @@ The mod guards against **mistakes** (a model that wanders off or picks the wrong
 Three layers:
 
 1. The **baseline** is the user file's `baseline` if present, else the shipped default.
-2. One **built-in profile**, `git-write`, ships with the mod. `examples/config.json` adds this repo's own baseline and an `issues` profile as an example.
-3. The **user file** adds profiles and may replace the built-in by reusing its name. The whole definition wins, with no merging.
+2. Two **built-in profiles**, `git-write` and `issues`, ship with the mod (`hooks/builtin-profiles.ts`).
+3. The **user file** adds profiles and may replace a built-in by reusing its name. The whole definition wins, with no merging.
 
 The user file is JSON at `$XDG_CONFIG_HOME/mode-gate/config.json`, falling back to `~/.config/mode-gate/config.json` on all platforms, Windows included. `MODE_GATE_CONFIG` overrides the path, mainly for tests and headless runs. The mod reads the environment through `$.env.get("NAME")` with literal names only (`MODE_GATE_PROFILES`, `MODE_GATE_CONFIG`, `XDG_CONFIG_HOME`, `HOME`, `USERPROFILE`); the home folder is `HOME`, else `USERPROFILE`. An empty-string value counts as unset for `MODE_GATE_CONFIG`, `XDG_CONFIG_HOME`, `HOME` and `USERPROFILE`. The shape is `{ "logDir": "logs", "baseline": { "allow": [], "ask": [], "deny": [] }, "profiles": { "<name>": { "description", "delegable", "allow", "ask", "deny" } } }`. `logDir` is optional (default `logs`). The baseline has no `description` and no `delegable`. A JSON Schema, `mode-gate.schema.json`, ships in the repo, and users reference it with `$schema`.
 
 A project may contain `.mode-gate.json` at its root, in the same shape. Its profiles are proposals and are never active. In the loaded config, `profiles` is a `Record<string, Profile>` keyed by profile name (the loader sets `Profile.name` from the key, so the two cannot differ) and the proposals are a second `Record<string, Profile>`. `/gate-check` lists them. The user adopts one by copying it into their own config by hand. Across active profiles, deny beats ask beats allow, whatever the source. A `baseline` or `logDir` in a project `.mode-gate.json` is ignored with a warning. An invalid config fails closed: the mod stays active with no profiles and an empty baseline (all three lists empty, never the default, so a broken setup cannot widen a baseline the user narrowed), `startProfiles` is always `[]`, and the errors are shown.
 
-**Not set up.** With no user file at the path in use, the mod gates nothing: every call keeps Claude Code's verdict, only the deny list of [Protected paths](#protected-paths) applies (so Claude cannot write the mod a permissive config), and the band shows `mode-gate: not set up — run /gate-setup`. `/gate-on` answers with the same hint. This holds in headless runs too.
+**Not set up.** With no user file at the path in use, the shipped default baseline applies and the built-in profiles can be switched on; a missing file is not an error. The path guards of [Protected paths](#protected-paths) apply as always (so Claude cannot write the mod a permissive config), and the band shows `mode-gate: not set up — run /gate-setup`. This holds in headless runs too.
 
 ### Baseline
 
