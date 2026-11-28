@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BASH_METACHARACTERS, decide } from "../hooks/policy";
+import { BASH_METACHARACTERS, decide } from "../plugin/hooks/policy";
 import { BASH_CHAIN_ROWS, BASH_TABLE } from "./fixtures/policy/bash";
 import type { ChainRow, Row } from "./fixtures/policy/builders";
 import { CORE_CHAIN_ROWS, CORE_TABLE } from "./fixtures/policy/core";

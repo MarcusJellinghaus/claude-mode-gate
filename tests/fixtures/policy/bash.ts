@@ -1,5 +1,11 @@
 // Step 4: strict Bash allow, boundary-checked deny and ask, the downgrade, malformed Bash.
-import type { ChainEntry, ClaudeVerdict, Decision, GuardResult, Rule } from "../../../hooks/policy";
+import type {
+  ChainEntry,
+  ClaudeVerdict,
+  Decision,
+  GuardResult,
+  Rule,
+} from "../../../plugin/hooks/policy";
 import type { ChainRow, Lists, Row } from "./builders";
 import {
   ALLOW,

@@ -1,5 +1,5 @@
 // Step 5: a subagent's Bash call that no allow rule holds is denied.
-import type { Call, ClaudeVerdict, Decision, GuardResult } from "../../../hooks/policy";
+import type { Call, ClaudeVerdict, Decision, GuardResult } from "../../../plugin/hooks/policy";
 import type { ChainRow, Lists, Row } from "./builders";
 import {
   ALLOW,

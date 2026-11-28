@@ -25,9 +25,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: Move the plugin into `plugin/` — [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: preconditions checked, tests first (`findSourceProblems`, tsconfig, repo-structure paths), moves with `move_file`, every path edit, kit smoke test, docs and CHANGELOG
-- [ ] Quality checks: `npm run format`, then `npm run check` — fix all issues
-- [ ] Commit message prepared: `refactor(plugin): move the plugin into plugin/` (then post the owner-request comment on issue #12)
+- [x] Implementation: preconditions checked, tests first (`findSourceProblems`, tsconfig, repo-structure paths), moves with `move_file`, every path edit, kit smoke test, docs and CHANGELOG
+- [x] Quality checks: `npm run format`, then `npm run check` — fix all issues
+- [x] Commit message prepared: `refactor(plugin): move the plugin into plugin/` (then post the owner-request comment on issue #12)
 
 ### Step 2: Pin Claude Code and add `scripts/claude.mjs` — [step_2.md](./steps/step_2.md)
 

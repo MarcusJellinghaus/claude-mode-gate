@@ -26,7 +26,7 @@ If you can't name the gap, use the MCP tool. Exempt: the approved `npm run` scri
 | Read, edit, write, append files                        | `read_file`, `edit_file`, `save_file`, `append_file`                                                  |
 | Delete file or directory, move                         | `delete_this_file`, `delete_directory`, `move_file`                                                   |
 | List, search                                           | `list_directory`, `search_files`                                                                      |
-| Engine API (`claude-code` types)                       | `read_file` / `search_files` on `.claude-plugin/types/claude-code/index.d.ts`                         |
+| Engine API (`claude-code` types)                       | `read_file` / `search_files` on `plugin/.claude-plugin/types/claude-code/index.d.ts`                  |
 | Dependency source                                      | `read_file` / `search_files` under `node_modules/<package>/`                                          |
 | Reference projects                                     | `get_reference_projects`, `read_reference_file`, `list_reference_directory`, `search_reference_files` |
 | Branch status, base branch, file size                  | `check_branch_status`, `get_base_branch`, `check_file_size`                                           |
@@ -40,7 +40,7 @@ If you can't name the gap, use the MCP tool. Exempt: the approved `npm run` scri
 | Check a JS/TS/Node behaviour before claiming it        | scratch probe (below)                                                                                 |
 | Follow mcp-coder's Jenkins builds for an issue         | `/jenkins_watch` (`python tools/jenkins_watch.py`; tests: `python -m pytest tests/tools -q`)          |
 
-`.mcp-file-access` exposes `.claude-plugin/types/` and `node_modules/` read-only, although both are gitignored.
+`.mcp-file-access` exposes `plugin/.claude-plugin/types/` and `node_modules/` read-only, although both are gitignored.
 
 **Never call the tools behind the npm scripts directly:** no `npx tsc`, `npx eslint`, `npx prettier`, `npx vitest`, `npx depcruise`, `npx knip`, and no `node -e`. The scripts carry the config and flags CI uses, and only they are pre-approved. One test file: `npm run test -- tests/<name>.test.ts`.
 
@@ -135,9 +135,9 @@ Rules for writing tests:
 
 Enforced by `npm run arch` and `tests/repo-structure.test.ts`.
 
-- `hooks/policy.ts` is pure. It imports nothing and uses no `$`, no state, no I/O.
-- `hooks/register.ts` is thin wiring that calls `policy.ts`. Nothing imports it.
-- Production code (`hooks/`, `types/`) never imports from `tests/` or from devDependencies.
+- `plugin/hooks/policy.ts` is pure. It imports nothing and uses no `$`, no state, no I/O.
+- `plugin/hooks/register.ts` is thin wiring that calls `policy.ts`. Nothing imports it.
+- Production code (`plugin/hooks/`, `plugin/types/`) never imports from `tests/` or from devDependencies.
 - No circular imports.
 - Every gating hook has a `.catch` that fails closed (`ask` or `deny`, never `allow`).
 

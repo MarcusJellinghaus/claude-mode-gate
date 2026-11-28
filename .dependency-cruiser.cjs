@@ -5,7 +5,7 @@ module.exports = {
       name: "policy-is-pure",
       comment: "policy.ts is pure decision logic: it may import nothing.",
       severity: "error",
-      from: { path: "^hooks/policy\\.ts$" },
+      from: { path: "^plugin/hooks/policy\\.ts$" },
       to: {},
     },
     {
@@ -13,12 +13,12 @@ module.exports = {
       comment: "register.ts is the wiring entry point. Nothing may import it, not even tests.",
       severity: "error",
       from: {},
-      to: { path: "^hooks/register\\.ts$" },
+      to: { path: "^plugin/hooks/register\\.ts$" },
     },
     {
       name: "production-code-never-imports-tests",
       severity: "error",
-      from: { path: "^(hooks|types)/" },
+      from: { path: "^plugin/(hooks|types)/" },
       to: { path: "^tests/" },
     },
     {
@@ -31,7 +31,7 @@ module.exports = {
       name: "no-dev-dependencies-in-hooks",
       comment: "Shipped hook code must not depend on devDependencies.",
       severity: "error",
-      from: { path: "^hooks/" },
+      from: { path: "^plugin/hooks/" },
       to: { dependencyTypes: ["npm-dev"] },
     },
   ],

@@ -1,4 +1,4 @@
-// Fail-closed guard: every gating hook registered in hooks/register.ts must have a .catch handler.
+// Fail-closed guard: every gating hook registered in plugin/hooks/register.ts must have a .catch handler.
 // Gating events are those that can allow or deny a call (see docs/design.md, "Failure").
 // The registration syntax ($.on("event", ...)) is an assumption until the mods API is verified.
 import { readFileSync } from "node:fs";
@@ -29,7 +29,7 @@ export function findUncaught(source) {
 
 /** @returns {number} */
 function main() {
-  const { scanned, uncaught } = findUncaught(readFileSync("hooks/register.ts", "utf8"));
+  const { scanned, uncaught } = findUncaught(readFileSync("plugin/hooks/register.ts", "utf8"));
   if (uncaught.length > 0) {
     console.error(
       uncaught.map((event) => `check:catch: hook for "${event}" has no .catch handler`).join("\n"),

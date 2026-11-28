@@ -14,7 +14,7 @@
 ## Testing
 
 - **No manual tests.** All tests must be automated.
-- **One test file per module.** Tests for `hooks/policy.ts` go in `tests/policy.test.ts`.
+- **One test file per module.** Tests for `plugin/hooks/policy.ts` go in `tests/policy.test.ts`.
 - **Table-driven tests** (`it.each`) are a good idea to reduce the number of required test functions while covering more cases.
 
 ## Code Quality

@@ -1,5 +1,5 @@
 // Steps 1 to 3: whole-tool rules, order, pass-through, malformed input, guards, protected asks.
-import type { Call, ClaudeVerdict } from "../../../hooks/policy";
+import type { Call, ClaudeVerdict } from "../../../plugin/hooks/policy";
 import type { ChainRow, Row } from "./builders";
 import {
   ALLOW,

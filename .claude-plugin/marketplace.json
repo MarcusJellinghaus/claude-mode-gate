@@ -5,7 +5,7 @@
   "plugins": [
     {
       "name": "mode-gate",
-      "source": "./",
+      "source": "./plugin",
       "description": "Switchable permission profiles for Claude Code."
     }
   ]

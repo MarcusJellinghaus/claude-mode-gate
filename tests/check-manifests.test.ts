@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findManifestProblems } from "../scripts/check-manifests.mjs";
+import { findManifestProblems, findSourceProblems } from "../scripts/check-manifests.mjs";
 
 const valid = () => ({
   plugin: { name: "gate", version: "1.0.0", description: "A gate." } as Record<string, unknown>,
@@ -81,5 +81,40 @@ describe("findManifestProblems", () => {
     const problems = findManifestProblems({ ...valid(), plugin: undefined }, always);
     expect(problems).toContain('plugin.json: missing "name"');
     expect(problems).toContain("marketplace.json: must list the plugin named in plugin.json");
+  });
+});
+
+describe("findSourceProblems", () => {
+  const one = (source: unknown) => ({ plugins: [{ name: "gate", source }] });
+  const listOne = "marketplace.json: must list exactly one plugin with a source folder";
+
+  it("passes one plugin whose source holds plugin.json", () => {
+    expect(findSourceProblems(one("./plugin"), always)).toEqual([]);
+  });
+
+  it.each([
+    ["no plugins list", {}],
+    ["an empty list", { plugins: [] }],
+    ["two entries", { plugins: [{ source: "./a" }, { source: "./b" }] }],
+    ["a source that is not a string", one(42)],
+    ["an empty source", one("")],
+    ["a marketplace that failed to load", undefined],
+  ])("reports %s", (_name, market) => {
+    expect(findSourceProblems(market, always)).toEqual([listOne]);
+  });
+
+  it("reports a source that holds no plugin.json", () => {
+    expect(findSourceProblems(one("./plugin"), () => false)).toEqual([
+      "marketplace.json: source ./plugin holds no .claude-plugin/plugin.json",
+    ]);
+  });
+
+  it("looks for plugin.json under the source, with / separators", () => {
+    const seen: string[] = [];
+    findSourceProblems(one("./plugin"), (path) => {
+      seen.push(path);
+      return true;
+    });
+    expect(seen).toEqual(["plugin/.claude-plugin/plugin.json"]);
   });
 });

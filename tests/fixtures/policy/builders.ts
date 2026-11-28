@@ -7,7 +7,7 @@ import type {
   GuardResult,
   Rule,
   RuleSet,
-} from "../../../hooks/policy";
+} from "../../../plugin/hooks/policy";
 
 export interface Row {
   name: string;

@@ -1,4 +1,4 @@
-// Lays the engine's `claude-code` types under .claude-plugin/types/ so `tsc` can resolve them.
+// Lays the engine's `claude-code` types under plugin/.claude-plugin/types/ so `tsc` can resolve them.
 // Claude Code writes them when it loads the mod from a folder it watches, before it checks the
 // login, so a `claude -p` run that fails to authenticate is enough (docs/design.md,
 // "Assumptions", rows 16 and 23).
@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const TYPES_FILE = ".claude-plugin/types/claude-code/index.d.ts";
+const TYPES_FILE = "plugin/.claude-plugin/types/claude-code/index.d.ts";
 
 /**
  * @param {{ exists: (path: string) => boolean, run: () => number, force?: boolean }} deps
@@ -40,10 +40,14 @@ export function claudeEnv(env) {
 /** @returns {number} */
 function runClaude() {
   // The exit code is ignored: the run fails at the login check, after the types are laid.
-  const result = spawnSync("claude", ["-p", "ok", "--plugin-dir", ".", "--strict-mcp-config"], {
-    stdio: "ignore",
-    env: claudeEnv(process.env),
-  });
+  const result = spawnSync(
+    "claude",
+    ["-p", "ok", "--plugin-dir", "plugin", "--strict-mcp-config"],
+    {
+      stdio: "ignore",
+      env: claudeEnv(process.env),
+    },
+  );
   return result.status ?? 1;
 }
 

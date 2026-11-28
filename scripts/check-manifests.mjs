@@ -1,6 +1,6 @@
 // Validates the plugin and marketplace manifests until `claude plugin validate` is wired into CI.
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -94,6 +94,48 @@ export function findManifestProblems(manifests, moduleExists) {
   ];
 }
 
+/**
+ * @param {Manifest | undefined} market
+ * @returns {string | undefined} the only plugin's source folder
+ */
+export function pluginSource(market) {
+  const plugins = market?.plugins;
+  if (!Array.isArray(plugins) || plugins.length !== 1) return undefined;
+  const entry = /** @type {unknown} */ (plugins[0]);
+  const source =
+    typeof entry === "object" && entry !== null && "source" in entry ? entry.source : undefined;
+  return typeof source === "string" && source !== "" ? source : undefined;
+}
+
+/**
+ * @param {Manifest | undefined} market
+ * @param {(path: string) => boolean} exists
+ * @returns {string[]}
+ */
+export function findSourceProblems(market, exists) {
+  const source = pluginSource(market);
+  if (source === undefined) {
+    return ["marketplace.json: must list exactly one plugin with a source folder"];
+  }
+  // posix.join keeps "/" separators on Windows too.
+  return exists(posix.join(source, ".claude-plugin/plugin.json"))
+    ? []
+    : [`marketplace.json: source ${source} holds no .claude-plugin/plugin.json`];
+}
+
+/**
+ * @param {string[]} errors
+ * @returns {number}
+ */
+function report(errors) {
+  if (errors.length > 0) {
+    console.error(errors.map((e) => `check:manifests: ${e}`).join("\n"));
+    return 1;
+  }
+  console.log("check:manifests: ok");
+  return 0;
+}
+
 /** @returns {number} */
 function main() {
   /** @type {string[]} */
@@ -104,7 +146,7 @@ function main() {
    */
   const load = (path) => {
     try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- called only with the fixed manifest paths below
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- called only with the manifest paths below, under the marketplace's own source folder
       const parsed = /** @type {unknown} */ (JSON.parse(readFileSync(path, "utf8")));
       return /** @type {Manifest} */ (parsed);
     } catch (err) {
@@ -112,23 +154,22 @@ function main() {
       return undefined;
     }
   };
+  const market = load(".claude-plugin/marketplace.json");
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- source folder from the repo's own marketplace.json, existence check only
+  const sourceErrors = findSourceProblems(market, (path) => existsSync(path));
+  const dir = pluginSource(market);
+  if (sourceErrors.length > 0 || dir === undefined) return report([...loadErrors, ...sourceErrors]);
   const manifests = {
-    plugin: load(".claude-plugin/plugin.json"),
-    market: load(".claude-plugin/marketplace.json"),
-    hooks: load("hooks/hooks.json"),
+    plugin: load(posix.join(dir, ".claude-plugin/plugin.json")),
+    market,
+    hooks: load(posix.join(dir, "hooks/hooks.json")),
     pkg: load("package.json"),
   };
-  const errors = [
+  return report([
     ...loadErrors,
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- module entry from the repo's own hooks.json, existence check only
-    ...findManifestProblems(manifests, (entry) => existsSync(resolve("hooks", entry))),
-  ];
-  if (errors.length > 0) {
-    console.error(errors.map((e) => `check:manifests: ${e}`).join("\n"));
-    return 1;
-  }
-  console.log("check:manifests: ok");
-  return 0;
+    ...findManifestProblems(manifests, (entry) => existsSync(resolve(dir, "hooks", entry))),
+  ]);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) process.exit(main());

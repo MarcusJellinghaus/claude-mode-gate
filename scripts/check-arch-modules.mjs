@@ -1,4 +1,5 @@
-// Arch guard: dependency-cruiser must cruise every .ts file under hooks, types and tests.
+// Arch guard: dependency-cruiser must cruise every .ts file under plugin/hooks, plugin/types,
+// plugin/tests and tests.
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,7 +7,7 @@ import { cruise } from "dependency-cruiser";
 import extractDepcruiseConfig from "dependency-cruiser/config-utl/extract-depcruise-config";
 import extractTSConfig from "dependency-cruiser/config-utl/extract-ts-config";
 
-const ROOTS = ["hooks", "types", "tests"];
+const ROOTS = ["plugin/hooks", "plugin/types", "plugin/tests", "tests"];
 const CONFIG = "./.dependency-cruiser.cjs";
 
 /** @param {string} path */
