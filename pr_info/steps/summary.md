@@ -137,8 +137,8 @@ Not touched: `hooks/register.ts` (wiring is Draft 12), `README.md` (no user-visi
 1. Types, `BASH_METACHARACTERS` and `decide` core: Claude Code pass-through, whole-tool matching, deny > ask > allow, reporting order, unknown `decision`, unusable tool name, chain recording.
 2. Guard results: deny guards (step 2) and ask guards (step 3) in the walks.
 3. Protected Claude Code asks: the allow walk skips under an ask carrying `setting`, `hook` or `plugin`.
-4. Bash matching: strict allow, boundary-checked deny and ask, `bash-downgrade`, metacharacter skips in the chain.
-5. Subagent Bash (step 1) and Bash calls without a string `command` (malformed).
+4. Bash matching: strict allow, boundary-checked deny and ask, `bash-downgrade`, metacharacter skips in the chain, and Bash calls without a string `command` (malformed).
+5. Subagent Bash (step 1).
 6. Boy Scout docs: `.claude/CLAUDE.md` and `docs/design.md`.
 
 ## Out of scope

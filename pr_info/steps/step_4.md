@@ -1,8 +1,8 @@
-# Step 4: Bash matching and the Bash downgrade
+# Step 4: Bash matching, the Bash downgrade and Bash calls without a command
 
 ## LLM prompt
 
-> Read `pr_info/steps/summary.md`, then implement `pr_info/steps/step_4.md` exactly. Steps 1 to 3 are done: `decide` handles whole-tool rules, guard results and protected asks. Work test-first: add the rows below, see them fail with `npm run test -- tests/policy.test.ts`, then implement. Write the metacharacter rows as literals, not generated from `BASH_METACHARACTERS`, so a change to the constant fails a test. Do not widen the matcher to catch the bypass rows: they are required to degrade to ask. Then run `npm run format`, `npm run check`, and commit `hooks/policy.ts`, `tests/policy.test.ts` and `CHANGELOG.md` with `git_commit` (`paths`), message `feat(policy): match Bash rules strictly for allow, by boundary for deny and ask`. If `tests/policy.test.ts` now passes 750 lines, move the tables and builders into `tests/fixtures/policy/*.ts` as the summary describes, and add those files to the commit.
+> Read `pr_info/steps/summary.md`, then implement `pr_info/steps/step_4.md` exactly. Steps 1 to 3 are done: `decide` handles whole-tool rules, guard results and protected asks. Work test-first: add the rows below, see them fail with `npm run test -- tests/policy.test.ts`, then implement. Write the metacharacter rows as literals, not generated from `BASH_METACHARACTERS`, so a change to the constant fails a test. Do not widen the matcher to catch the bypass rows: they are required to degrade to ask. Then run `npm run format`, `npm run check`, and commit `hooks/policy.ts`, `tests/policy.test.ts` and `CHANGELOG.md` with `git_commit` (`paths`), message `feat(policy): match Bash rules strictly for allow, by boundary for deny and ask; a missing command is malformed`. `npm run check` includes `npm run test:coverage` (95% on `hooks/policy.ts`), so every branch added here needs a row in this step. If `tests/policy.test.ts` now passes 750 lines, move the tables and builders into `tests/fixtures/policy/*.ts` as the summary describes, and add those files to the commit.
 
 ## WHERE
 
@@ -28,16 +28,18 @@ function allowMatch(
   rule: Rule,
   name: string | undefined,
   command: string | undefined,
+  malformed: boolean,
 ): "hit" | "meta" | "miss";
 ```
 
-`decide` reads `command = commandOf(call.input)` once, next to `name`, and passes it to the walks.
+`decide` reads `command = commandOf(call.input)` once, next to `name`, and passes it to the walks. It also computes `malformed = name === undefined || (name === "Bash" && command === undefined)`; the existing malformed check after the deny walk uses it instead of `name === undefined`. `allowMatch` returns `"miss"` when `malformed`, so no allow rule, not even allow `Bash` or allow `*`, matches malformed input (step 5's "held" check relies on this).
 
 ## HOW
 
 - `commandOf` narrows: `typeof input === "object" && input !== null && "command" in input`, then `typeof … === "string"` (use bracket access only if `noPropertyAccessFromIndexSignature` demands it; `scripts/agent-bash-guard.mjs` shows the pattern).
 - `walk` (deny, ask) uses `matches`; `allowWalk` uses `allowMatch` and checks the metacharacter skip before the protected skip, so a rule skipped for both shows the metacharacter reason.
 - Final pass-through: a Bash call with Claude Code `allow` returns `{ verdict: "ask", source: "bash-downgrade" }`, with no `rule` and no `message` key.
+- No special code for "only whole-tool denies beat malformed input": with `command` undefined, `matches` returns `false` for every exact and prefix rule, `deny Bash(*)` included.
 - String operations only: never build a `RegExp` from rule text. The only regex is the fixed `/\s/` on one character. `charAt` returns `""` before the start and after the end, which `isBoundary` treats as a boundary.
 
 ## ALGORITHM
@@ -48,7 +50,9 @@ denyAskHit(text, cmd): if text === "": return true
     if isBoundary(cmd.charAt(i - 1)) and isBoundary(cmd.charAt(i + text.length)): return true
   return false
 matches: whole → wholeMatches(rule, name, cls); name !== "Bash" or command undefined → false; else denyAskHit(rule.arg.trim(), command)
-allowMatch: whole → wholeMatches(rule, name, "allow") ? "hit" : "miss"; name !== "Bash" or command undefined → "miss"
+core: … name, command; malformed = name === undefined or (name === "Bash" and command === undefined)
+  deny walk; if malformed or not isVerdict(claude.decision): return { verdict: "ask", source: "malformed" }
+allowMatch: malformed → "miss"; whole → wholeMatches(rule, name, "allow") ? "hit" : "miss"; name !== "Bash" or command undefined → "miss"
   strict = kind "exact" ? command === arg : command.startsWith(arg); if not strict → "miss"; return hasMeta(command) ? "meta" : "hit"
 ```
 
@@ -88,6 +92,16 @@ Deny and ask side (boundary-checked):
 - Reporting order with Bash: two matching Bash deny rules in one list → the first.
 - Claude Code deny for a Bash call under a matching allow stays the Claude Code deny.
 - Unknown Claude Code `decision` (`"maybe"`) with a matching exact deny `rm -rf /` → `deny`, `rule`; with a matching prefix deny → `deny`, `rule`; with only a matching allow → `ask`, `malformed`.
+- Bash rules never touch a non-Bash tool on the deny side: deny `exact("rm -rf /")` and deny `prefix("git push ")` with `Read` (input `{ file_path: "x" }`) under Claude Code `ask` → `ask`, `claude-code`.
+
+Malformed Bash (missing `command`: input `{}`; non-string: `{ command: 42 }`; input `null`; input `"ls"`), no `agentId`:
+
+- under allow `Bash` and under allow `*` → `ask`, `malformed` (never `allow`);
+- under deny `*` and under deny `Bash` → `deny`, `rule`; under a `deny` guard result → `deny`, `guard`;
+- under ask `Bash` → `ask`, `malformed`; under an `ask` guard result → `ask`, `malformed`;
+- under deny `prefix("")` (`Bash(*)`) → `ask`, `malformed`;
+- with a Claude Code deny → the Claude Code deny.
+- Never `allow` on its own: a table test that no malformed row and no unknown-`decision` row in `ROWS` has `verdict` `allow` (later steps' rows of these kinds are covered too).
 
 Chain rows (`withChain: true`):
 
@@ -95,7 +109,8 @@ Chain rows (`withChain: true`):
 - The same command with a second set allowing `Bash` (whole) → `allow` from the second set; chain: the skipped prefix rule, then the whole-tool entry.
 - Protected ask plus metacharacter: allow `prefix("gh issue edit ")`, `gh issue edit 1 && x`, Claude Code ask with `hook` → chain shows the metacharacter reason, not the protected one.
 - Unknown decision: `gh issue edit 1 && x` under allow `prefix("gh issue edit ")` with `decision: "maybe"` → `ask`, `malformed`, chain `[]`.
+- Malformed Bash (no `command`) under allow `Bash` → `ask`, `malformed`, chain `[]` (no allow entry).
 
 ## CHANGELOG
 
-Extend the `decide()` entry: Bash allow rules are strict (exact or prefix, never with a `BASH_METACHARACTERS` entry in the command); Bash deny and ask rules use a boundary-checked substring test; an unmatched Bash call that Claude Code would allow asks (`bash-downgrade`).
+Extend the `decide()` entry: Bash allow rules are strict (exact or prefix, never with a `BASH_METACHARACTERS` entry in the command); Bash deny and ask rules use a boundary-checked substring test; an unmatched Bash call that Claude Code would allow asks (`bash-downgrade`); a Bash call without a string `command` asks (`malformed`) unless a whole-tool deny or a deny guard result denies it.
