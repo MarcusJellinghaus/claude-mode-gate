@@ -729,6 +729,53 @@ async function loadProposals(
   };
 }
 
+interface Layer {
+  set: RuleSet;
+  source: Source;
+  prefix: string;
+}
+
+// Same-layer repeats are left to checkSetFindings, and only equal list types are compared.
+function crossLayerFindings(layers: readonly Layer[]): Issue[] {
+  const first = new Map<string, { layer: number; path: string }>();
+  const warnings: Issue[] = [];
+  for (const [n, { set, source, prefix }] of layers.entries()) {
+    for (const [list, rules] of listEntries(set)) {
+      for (const [i, rule] of rules.entries()) {
+        const key = `${list}|${patternKey(rule)}`;
+        const path = `${prefix}.${list}[${String(i)}]`;
+        const seen = first.get(key);
+        if (seen === undefined) first.set(key, { layer: n, path });
+        else if (seen.layer !== n)
+          warnings.push({
+            severity: "warning",
+            source,
+            path,
+            message: `same pattern as ${seen.path}`,
+          });
+      }
+    }
+  }
+  return warnings;
+}
+
+// The baseline in effect, the built-ins no user profile replaces, then the user profiles.
+function buildLayers(
+  baseline: { set: RuleSet; source: Source } | undefined,
+  builtins: Record<string, Profile>,
+  userProfiles: Record<string, Profile>,
+): Layer[] {
+  const profileLayer =
+    (source: Source) =>
+    (set: Profile): Layer => ({ set, source, prefix: `profiles.${set.name}` });
+  const kept = Object.values(builtins).filter((p) => !Object.hasOwn(userProfiles, p.name));
+  return [
+    ...(baseline ? [{ ...baseline, prefix: "baseline" }] : []),
+    ...kept.map(profileLayer("builtin")),
+    ...Object.values(userProfiles).map(profileLayer("user")),
+  ];
+}
+
 export async function loadConfig(deps: LoadDeps): Promise<LoadResult> {
   const { readFile, cwd, baseline = defaultBaseline, builtins = builtinProfiles } = deps;
   const { env, warnings } = trustedEnv(deps.env, deps.untrustedEnv);
@@ -739,6 +786,7 @@ export async function loadConfig(deps: LoadDeps): Promise<LoadResult> {
   const configPath = "path" in resolved ? resolved.path : undefined;
   if ("issue" in resolved) issues.push(resolved.issue);
   let selected = defaults.baseline;
+  let baselineSource: Source = "baseline";
   let userProfiles: Record<string, Profile> = {};
   let userLogDir: string | undefined;
   if (configPath !== undefined) {
@@ -748,12 +796,16 @@ export async function loadConfig(deps: LoadDeps): Promise<LoadResult> {
       const user = checkFile(read.value, "user");
       issues.push(...user.issues);
       // A user baseline replaces the default whole, also when it is invalid: then the load fails.
-      if (isPlainObject(read.value) && Object.hasOwn(read.value, "baseline"))
+      if (isPlainObject(read.value) && Object.hasOwn(read.value, "baseline")) {
         selected = user.baseline;
+        baselineSource = "user";
+      }
       userProfiles = user.profiles;
       userLogDir = user.logDir;
     }
   }
+  const effective = selected && { set: selected, source: baselineSource };
+  issues.push(...crossLayerFindings(buildLayers(effective, shipped.profiles, userProfiles)));
   const project = await loadProposals(readFile, cwd);
   issues.push(...project.warnings);
   const start = parseStartProfiles(env);

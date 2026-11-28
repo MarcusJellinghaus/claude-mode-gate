@@ -97,9 +97,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 13: cross-layer duplicate findings ([step_13.md](./steps/step_13.md))
 
-- [ ] Implementation: `tests/config-layers.test.ts`, `crossLayerFindings` in `hooks/config.ts`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `tests/config-layers.test.ts`, `crossLayerFindings` in `hooks/config.ts`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 14: `docs/design.md` for the configurable baseline and the config module ([step_14.md](./steps/step_14.md))
 
