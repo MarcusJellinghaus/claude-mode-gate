@@ -102,6 +102,6 @@ Step 8 posts these as a comment on issue #12.
 - The launcher warning, by hand, in `claude.bat` and `claude.sh`.
 - On Windows, `npm run plugin:validate` runs the pinned binary, not `claude.bat`.
 - One `/plugin install mode-gate` from the local marketplace installs the `./plugin` source.
-- `plugin:validate` and `plugin:test` behave the same on Linux CI as on Windows.
+- A later Linux CI run of `plugin:validate` or `plugin:test` that differs from Windows (step 5 checks the first run).
 - The refresh list (wiki `Processes/Chore Implementation`, step 3) names the new adaptations: the `planning_principles.md` path and the agent gate lists.
 - After merge: the next Dependabot run opens a separate PR for `@anthropic-ai/claude-code`.

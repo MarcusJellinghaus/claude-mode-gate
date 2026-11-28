@@ -56,6 +56,7 @@ Run `npm run test` and see test 1 fail. Test 2 passes from the start: check it f
 
 - `npm run check` runs both gates as child processes (it works whatever the agent's own Bash guard allows) and both pass.
 - If `plugin:validate` reports an error that is not a path issue fixable in this step, or `plugin:test` fails, write one line to `pr_info/.blocked.txt` and stop.
+- Linux CI: after the commit, `git_push`, then read the push-checks jobs `typecheck` (pinned since step 4), `plugin:validate` and `plugin:test` with `check_branch_status`. If one fails on Linux but passes on Windows, write one line to `pr_info/.blocked.txt`, post a stop-and-ask comment on issue #12 with `github_issue_comment` (which job, the failing output, and that the Windows run passes), and stop.
 
 ## DATA
 

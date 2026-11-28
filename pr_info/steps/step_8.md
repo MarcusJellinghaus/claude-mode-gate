@@ -9,7 +9,7 @@ Post the end-of-PR owner steps on issue #12 with `github_issue_comment`, so the 
 - Check the launcher warning by hand in `claude.bat` and `claude.sh` (a matching and a differing version).
 - On Windows, check once that `npm run plugin:validate` runs the pinned binary, not `claude.bat`.
 - Run one `/plugin install mode-gate` from the local marketplace to confirm the `./plugin` source installs end to end.
-- Compare the Linux CI runs of `plugin:validate` and `plugin:test` with Windows; if they differ, tell the implementer.
+- The implementer checked the Linux CI jobs `typecheck`, `plugin:validate` and `plugin:test` in step 5; if a later Linux run differs from Windows, tell the implementer.
 - Add the new adaptations (the `planning_principles.md` path, the agent gate lists) to the refresh list (wiki `Processes/Chore Implementation`, step 3), or ask the main session to.
 - Delete the old gitignored root `.claude-plugin/types/` folder and remove its `.mcp-file-access` rule, if not done yet (this step's precondition).
 

@@ -50,8 +50,12 @@ claudeCommand(pkgDir, bin, args, nodePath):
 runClaude(args, options):
   pkgFile = createRequire(import.meta.url).resolve("@anthropic-ai/claude-code/package.json")   // literal specifier: knip sees the dependency
   { command, args } = claudeCommand(dirname(pkgFile), JSON.parse(readFileSync(pkgFile)).bin, args, process.execPath)
-  return spawnSync(command, args, { stdio, env: { ...env, DISABLE_AUTOUPDATER: "1" } }).status ?? 1   // no shell
+  result = spawnSync(command, args, { stdio, env: { ...env, DISABLE_AUTOUPDATER: "1" } })   // no shell
+  if result.error: console.error(`claude: ${result.error.message}`); return 1   // ENOENT/EACCES would otherwise exit 1 with no output
+  return result.status ?? 1
 ```
+
+The spawn-error branch stays inline in `runClaude`: it is I/O, not a pure helper, so it gets no table row.
 
 ## Tests first (`tests/claude.test.ts`)
 
@@ -75,7 +79,7 @@ Table over `claudeCommand` with `path.resolve` for the expected paths:
 ## DATA
 
 - `claudeCommand` → `{ command, args }`.
-- `runClaude` → exit code, `1` when the child has none.
+- `runClaude` → exit code; `1`, with the spawn error on stderr, when the spawn fails; `1` when the child has no exit code.
 
 ## Checks and commit
 
