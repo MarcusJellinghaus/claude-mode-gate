@@ -19,21 +19,18 @@ const MCP_PREFIX = "mcp__";
 
 const fail = (message: string): ParsedRule => ({ ok: false, message });
 
-// A server or tool segment: runs of [A-Za-z0-9-] joined by single underscores.
-function isMcpSegment(segment: string): boolean {
-  return (
-    NAME_CHARS.test(segment) &&
-    !segment.startsWith("_") &&
-    !segment.endsWith("_") &&
-    !segment.includes("__")
-  );
+// The server ends at the first "__", so it cannot start or end with "_"; the tool is the rest.
+function isMcpServer(server: string): boolean {
+  return NAME_CHARS.test(server) && !server.startsWith("_") && !server.endsWith("_");
 }
 
 function isToolName(name: string): boolean {
   if (name === "*") return true;
   if (!name.startsWith(MCP_PREFIX)) return NAME_CHARS.test(name);
-  const segments = name.slice(MCP_PREFIX.length).split("__");
-  return segments.length <= 2 && segments.every(isMcpSegment);
+  const rest = name.slice(MCP_PREFIX.length);
+  const split = rest.indexOf("__");
+  if (split === -1) return isMcpServer(rest);
+  return isMcpServer(rest.slice(0, split)) && NAME_CHARS.test(rest.slice(split + 2));
 }
 
 function bashRule(kind: "exact" | "prefix", arg: string, raw: string): ParsedRule {
@@ -214,7 +211,7 @@ const OVER_BROAD_ERROR =
 const OVER_BROAD_WARNING =
   "Over-broad allow: the rule allows every tool of the MCP server. Name the tools to allow.";
 
-// parseRule has checked the segments, so a server with no `__tool` part has no second "__".
+// The server ends at the first "__" after the prefix, so a bare server has none.
 function isBareMcpServer(tool: string): boolean {
   return tool.startsWith(MCP_PREFIX) && !tool.slice(MCP_PREFIX.length).includes("__");
 }
@@ -673,6 +670,7 @@ function buildResult(parts: ResultParts): LoadResult {
   const errors = issues.filter((i) => i.severity === "error");
   const warnings = issues.filter((i) => i.severity === "warning");
   const path = configPath === undefined ? {} : { configPath };
+  const logDir = resolveLogDir(cwd, userLogDir ?? "logs");
   if (errors.length === 0 && baseline) {
     const startProfiles = startNames.filter((name) => Object.hasOwn(profiles, name));
     const unknown = startNames.filter((name) => !Object.hasOwn(profiles, name));
@@ -680,7 +678,7 @@ function buildResult(parts: ResultParts): LoadResult {
       ok: true,
       config: { baseline, profiles, proposals },
       ...path,
-      logDir: resolveLogDir(cwd, userLogDir ?? "logs"),
+      logDir,
       startProfiles,
       warnings: [...warnings, ...unknown.map(unknownProfile)],
     };
@@ -690,7 +688,7 @@ function buildResult(parts: ResultParts): LoadResult {
     errors,
     baseline: { name: "baseline", allow: [], ask: [], deny: [] },
     ...path,
-    logDir: joinPath(cwd, "logs"),
+    logDir,
     startProfiles: [],
     warnings,
   };
@@ -803,7 +801,8 @@ export async function loadConfig(deps: LoadDeps): Promise<LoadResult> {
         baselineSource = "user";
       }
       userProfiles = user.profiles;
-      userLogDir = user.logDir;
+      // An invalid user file is not trusted with the log folder either.
+      if (!user.issues.some((i) => i.severity === "error")) userLogDir = user.logDir;
     }
   }
   const effective = selected && { set: selected, source: baselineSource };

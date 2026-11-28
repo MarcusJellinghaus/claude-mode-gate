@@ -5,6 +5,10 @@ import { fakeDeps, USER_CONFIG } from "./config-fixtures";
 
 const VALID_USER = JSON.stringify({ baseline: { allow: ["Read"] } });
 const INVALID_USER = JSON.stringify({ profiles: { p: { description: "d", allow: "x" } } });
+const INVALID_WITH_BASELINE = JSON.stringify({
+  baseline: { allow: ["Read"] },
+  profiles: { p: { description: "d", allow: "x" } },
+});
 const UNC_CONFIG = "\\\\srv\\share\\mg.json";
 
 const withEnv = (env: LoadDeps["env"], files: Record<string, string | Error> = {}) =>
@@ -39,6 +43,11 @@ const failRows: [string, LoadDeps, Record<string, unknown>?][] = [
   [
     "a user file that fails validation",
     fakeDeps({ [USER_CONFIG]: INVALID_USER }),
+    { source: "user", path: "profiles.p.allow" },
+  ],
+  [
+    "a user file with a valid baseline that fails validation elsewhere",
+    fakeDeps({ [USER_CONFIG]: INVALID_WITH_BASELINE }),
     { source: "user", path: "profiles.p.allow" },
   ],
   [
@@ -118,6 +127,15 @@ describe("loadConfig: logDir", () => {
     const result = await loadConfig(fakeDeps({ [USER_CONFIG]: user }));
     expect(result.ok).toBe(false);
     expect(result.logDir).toBe("/repo/logs");
+  });
+
+  it.each<[string, Partial<LoadDeps>]>([
+    ["a broken built-in", { builtins: { p: { description: "d", allow: ["Edit(x)"] } } }],
+    ["a broken default baseline", { baseline: { allow: ["Bash(git*)"] } }],
+  ])("keeps a valid user file's logDir when the load fails on %s", async (_name, overrides) => {
+    const user = JSON.stringify({ logDir: "/var/log/mg" });
+    const result = await loadFail(fakeDeps({ [USER_CONFIG]: user }, overrides));
+    expect(result.logDir).toBe("/var/log/mg");
   });
 });
 

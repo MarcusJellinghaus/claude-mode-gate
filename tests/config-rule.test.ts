@@ -18,6 +18,11 @@ const VALID: [string, Rule][] = [
   ["mcp__s__t", whole("mcp__s__t")],
   ["mcp__a_b__c_d", whole("mcp__a_b__c_d")],
   ["mcp__mcp-workspace__read_file", whole("mcp__mcp-workspace__read_file")],
+  // The tool segment is everything after the server, so it may hold "__" and edge underscores.
+  ["mcp__s__t__u", whole("mcp__s__t__u")],
+  ["mcp__s___t", whole("mcp__s___t")],
+  ["mcp__s__t_", whole("mcp__s__t_")],
+  ["mcp__s__t-u", whole("mcp__s__t-u")],
   ["Bash(npm run check)", bash("exact", "npm run check", "Bash(npm run check)")],
   ["Bash(npm run check:docs)", bash("exact", "npm run check:docs", "Bash(npm run check:docs)")],
   ["Bash(git commit *)", bash("prefix", "git commit ", "Bash(git commit *)")],
@@ -32,8 +37,7 @@ const VALID: [string, Rule][] = [
 const PLAIN_ERRORS = [
   "mcp__",
   "mcp__s__",
-  "mcp__s___t",
-  "mcp__s__t__u",
+  "mcp__s__t u",
   "mcp___s",
   "mcp__s_",
   " Bash",
@@ -67,6 +71,7 @@ const CLASS_ERRORS: [string, string][] = [
   ["Bash( git push:*)", ARG_WHITESPACE],
   ["Bash(git status )", ARG_WHITESPACE],
   ["Bash( git status)", ARG_WHITESPACE],
+  // Edge whitespace is JavaScript \s, so a leading non-breaking space is an error too.
   ["Bash( git push *)", ARG_WHITESPACE],
 ];
 
