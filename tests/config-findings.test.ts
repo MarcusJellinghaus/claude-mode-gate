@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { validateConfig } from "../hooks/config";
+import { covers, parseRule, validateConfig } from "../hooks/config";
+import type { Rule } from "../hooks/policy";
 
 type List = "allow" | "ask" | "deny";
 interface Finding {
@@ -138,5 +139,105 @@ describe("per-rule findings", () => {
     const input = inProfile("allow", ["mcp__s", "Bassh", "Read"]);
     const severities = validateConfig(input, "user").map((i) => i.severity);
     expect(severities).toStrictEqual(["warning", "warning"]);
+  });
+});
+
+const rule = (raw: string): Rule => {
+  const parsed = parseRule(raw);
+  if (!parsed.ok) throw new Error(`test rule "${raw}" does not parse`);
+  return parsed.rule;
+};
+
+const COVERS: [string, string, boolean][] = [
+  ["Bash(git push *)", "Bash(git push origin)", true],
+  ["Bash(git push *)", "Bash(git push)", true],
+  ["Bash(git push)", "Bash(git push origin)", true],
+  ["Bash(git push)", "Bash(git pu)", false],
+  ["*", "Edit", true],
+  ["*", "Bash(x)", true],
+  ["*", "mcp__s__t", true],
+  ["Bash", "Bash(git status)", true],
+  ["Edit", "Write", false],
+  ["mcp__s", "mcp__s__t", true],
+  ["mcp__s", "mcp__other__t", false],
+  ["Foo", "Foo__bar", false],
+  ["Bash(git push *)", "Edit", false],
+];
+
+type Lists = Partial<Record<List, string[]>>;
+const profileWith = (lists: Lists): unknown => ({
+  profiles: { p: { description: "d", ...lists } },
+});
+const finding = (severity: Finding["severity"], path: string, message: string): Finding => ({
+  severity,
+  path,
+  message,
+});
+
+const SET_ROWS: [string, unknown, Finding[]][] = [
+  [
+    "a pattern twice in allow",
+    profileWith({ allow: ["Read", "Read"] }),
+    [finding("warning", "profiles.p.allow[1]", "duplicate of allow[0]")],
+  ],
+  [
+    "a pattern twice in deny",
+    profileWith({ deny: ["Edit", "Edit"] }),
+    [finding("warning", "profiles.p.deny[1]", "duplicate of deny[0]")],
+  ],
+  [
+    "the same pattern in allow and deny",
+    profileWith({ allow: ["Bash(git push:*)"], deny: ["Bash(git push *)"] }),
+    [finding("error", "profiles.p.deny[0]", "duplicate of allow[0]")],
+  ],
+  [
+    "the same pattern in ask and deny",
+    profileWith({ ask: ["Edit"], deny: ["Edit"] }),
+    [finding("error", "profiles.p.deny[0]", "duplicate of ask[0]")],
+  ],
+  [
+    "an allow covered by a deny",
+    profileWith({ allow: ["Bash(git push)"], deny: ["Bash(git push *)"] }),
+    [finding("warning", "profiles.p.allow[0]", "covered by deny[0]")],
+  ],
+  [
+    "an allow covered by an ask",
+    profileWith({ allow: ["Bash(git status)"], ask: ["Bash"] }),
+    [finding("warning", "profiles.p.allow[0]", "covered by ask[0]")],
+  ],
+  [
+    "an allow no ask or deny covers",
+    profileWith({ allow: ["Bash(git status)"], deny: ["Bash(git push *)"] }),
+    [],
+  ],
+  [
+    "baseline: the same pattern in allow and deny",
+    { baseline: { allow: ["Bash(git push:*)"], deny: ["Bash(git push *)"] } },
+    [finding("error", "baseline.deny[0]", "duplicate of allow[0]")],
+  ],
+  [
+    "baseline: an allow covered by a deny",
+    { baseline: { allow: ["Bash(git push)"], deny: ["Bash(git push *)"] } },
+    [finding("warning", "baseline.allow[0]", "covered by deny[0]")],
+  ],
+  [
+    "a deny in one profile against an allow in another",
+    {
+      profiles: {
+        a: { description: "d", allow: ["Bash(git push)"] },
+        b: { description: "d", deny: ["Bash(git push *)"] },
+      },
+    },
+    [],
+  ],
+];
+
+describe("per-set findings", () => {
+  it.each(COVERS)("deny %s covers %s: %s", (p, q, expected) => {
+    expect(covers(rule(p), rule(q))).toBe(expected);
+  });
+
+  it.each(SET_ROWS)("%s", (_, input, expected) => {
+    expect(findings(input)).toStrictEqual(expected);
   });
 });

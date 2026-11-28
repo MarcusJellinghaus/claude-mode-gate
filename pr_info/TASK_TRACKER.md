@@ -61,9 +61,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 7: per-set findings (duplicates, covered allows) ([step_7.md](./steps/step_7.md))
 
-- [ ] Implementation: `covers` table and rows in `tests/config-findings.test.ts`, `covers` and `checkSetFindings` in `hooks/config.ts`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `covers` table and rows in `tests/config-findings.test.ts`, `covers` and `checkSetFindings` in `hooks/config.ts`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 8: path helpers, environment filter, config path ([step_8.md](./steps/step_8.md))
 

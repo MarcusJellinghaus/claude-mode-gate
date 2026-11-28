@@ -1,3 +1,4 @@
+import { decide } from "./policy";
 import type { Profile, Rule, RuleSet } from "./policy";
 
 export const ARG_ON_NON_BASH =
@@ -291,6 +292,75 @@ function checkList(
   return rules.length === raw.length ? rules : undefined;
 }
 
+// The one "same pattern" key: `Bash(git push:*)` and `Bash(git push *)` share it.
+function patternKey(rule: Rule): string {
+  return `${rule.tool}|${rule.kind}|${rule.kind === "whole" ? "" : rule.arg}`;
+}
+
+// Whether deny or ask rule P blocks every call allow rule Q would allow. Bash arguments go
+// through decide itself, so the validator and the gate cannot disagree.
+export function covers(p: Rule, q: Rule): boolean {
+  if (p.kind === "whole") {
+    return (
+      p.tool === "*" ||
+      p.tool === q.tool ||
+      (p.tool.startsWith(MCP_PREFIX) && q.tool.startsWith(`${p.tool}__`))
+    );
+  }
+  if (q.kind === "whole") return false;
+  const decision = decide({
+    call: { toolName: "Bash", input: { command: q.arg } },
+    sets: [{ name: "covers", allow: [], ask: [], deny: [p] }],
+    guards: [],
+    claude: { decision: "allow" },
+  });
+  return decision.verdict === "deny";
+}
+
+const listEntries = (lists: RuleLists): [ListName, Rule[]][] => [
+  ["allow", lists.allow],
+  ["ask", lists.ask],
+  ["deny", lists.deny],
+];
+
+function findCover(q: Rule, lists: RuleLists): string | undefined {
+  const blocking = [
+    ["ask", lists.ask],
+    ["deny", lists.deny],
+  ] as const;
+  for (const [list, rules] of blocking) {
+    const j = rules.findIndex((p) => covers(p, q));
+    if (j !== -1) return `${list}[${String(j)}]`;
+  }
+  return undefined;
+}
+
+// A pattern in two lists is an error; an allow it concerns gets no covered warning on top.
+function checkSetFindings(lists: RuleLists, prefix: string, issue: IssueSink): void {
+  const first = new Map<string, { list: ListName; at: string }>();
+  const inTwoLists = new Set<string>();
+  for (const [list, rules] of listEntries(lists)) {
+    for (const [i, rule] of rules.entries()) {
+      const key = patternKey(rule);
+      const at = `${list}[${String(i)}]`;
+      const seen = first.get(key);
+      if (seen === undefined) {
+        first.set(key, { list, at });
+        continue;
+      }
+      const sameList = seen.list === list;
+      if (!sameList) inTwoLists.add(key);
+      issue(sameList ? "warning" : "error", `${prefix}.${at}`, `duplicate of ${seen.at}`);
+    }
+  }
+  for (const [i, rule] of lists.allow.entries()) {
+    if (inTwoLists.has(patternKey(rule))) continue;
+    const cover = findCover(rule, lists);
+    if (cover !== undefined)
+      issue("warning", `${prefix}.allow[${String(i)}]`, `covered by ${cover}`);
+  }
+}
+
 function checkRuleLists(
   raw: unknown,
   prefix: string,
@@ -306,8 +376,10 @@ function checkRuleLists(
   const allow = checkList(rawAllow, prefix, "allow", issue);
   const ask = checkList(rawAsk, prefix, "ask", issue);
   const deny = checkList(rawDeny, prefix, "deny", issue);
-  if (!keysOk || !allow || !ask || !deny) return undefined;
-  return { allow, ask, deny };
+  if (!allow || !ask || !deny) return undefined;
+  const lists = { allow, ask, deny };
+  checkSetFindings(lists, prefix, issue);
+  return keysOk ? lists : undefined;
 }
 
 function checkLogDir(raw: unknown, issue: IssueSink): string | undefined {
