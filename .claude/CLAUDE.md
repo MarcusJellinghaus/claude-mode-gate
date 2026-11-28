@@ -101,8 +101,8 @@ Run everything with `npm run check`. It runs each gate below in order (`scripts/
 | `npm run check:pins`      | workflow actions are pinned to a full commit SHA                                                                                                                                                                         |
 | `npm run check:docs`      | required docs exist (`RELEASE=1` also bans placeholders)                                                                                                                                                                 |
 | `npm run test`            | vitest unit tests                                                                                                                                                                                                        |
-| `npm run test:coverage`   | unit tests with a 95% threshold on `policy.ts`                                                                                                                                                                           |
-| `npm run test:mutation`   | Stryker mutation tests on `policy.ts` (slow)                                                                                                                                                                             |
+| `npm run test:coverage`   | unit tests with a 95% threshold per file on `policy.ts` and `config.ts`                                                                                                                                                  |
+| `npm run test:mutation`   | Stryker mutation tests on `policy.ts` and `config.ts` (slow)                                                                                                                                                             |
 | `npm run audit`           | `npm audit` at high severity, minus `audit-allowlist.json`                                                                                                                                                               |
 
 These commands, plus `npm run types:lay` and `npm run test -- <file>`, are pre-approved in `.claude/settings.json`, so run them freely without asking. `npm run test:mutation` is not: it is slow and runs in CI, so it asks. Run `npm run check` before every commit.
@@ -113,10 +113,9 @@ The strategy is layered. Cheap, deterministic gates run first, and the security 
 
 1. **Static analysis.** Strict TypeScript and type-aware ESLint catch type errors, unhandled promises (`no-floating-promises` matters here: an unhandled promise skips the fail-closed `.catch`) and non-exhaustive `switch` statements over verdicts or modes. Prettier keeps formatting out of reviews.
 2. **Architecture checks.** dependency-cruiser enforces the structure in "Architecture rules" below. knip removes dead code, which in a security gate is also attack surface.
-3. **Unit tests (vitest).** `policy.ts` is pure, so it is tested with tables: one row per case, with the call, the mode and the expected verdict. Cover at least:
+3. **Unit tests (vitest).** `policy.ts` is pure, so it is tested with tables: one row per case, with the call, the active rule sets, the guard results, Claude Code's verdict and the expected decision. Cover at least:
    - every rule in the decision order, and the order itself (the first match wins);
    - Bash with chained commands (`&&`, `;`, `|`), substitution (`$()`, backticks), newlines and odd spacing;
-   - protected paths, including relative paths and `..`;
    - that a deny from Claude Code is never overridden;
    - that unknown input falls back to `ask` or `deny`, never `allow`.
 4. **Wiring tests.** `register.ts` is thin and is tested through the plugin test kit once its API is verified (assumption 4 in `docs/design.md`). Include fail-closed tests (a guard that throws produces a deny), the reset test (after `/clear` no profile stays active) and the band test.
@@ -138,6 +137,8 @@ Enforced by `npm run arch` and `tests/repo-structure.test.ts`.
 
 - `hooks/policy.ts` is pure. It imports nothing and uses no `$`, no state, no I/O.
 - `hooks/register.ts` is thin wiring that calls `policy.ts`. Nothing imports it.
+- The data files `hooks/baseline.ts` and `hooks/builtin-profiles.ts` import nothing at runtime; they may import types from `policy.ts` only.
+- `hooks/config.ts` may import only `policy.ts`, `baseline.ts` and `builtin-profiles.ts`.
 - Production code (`hooks/`, `types/`) never imports from `tests/` or from devDependencies.
 - No circular imports.
 - Every gating hook has a `.catch` that fails closed (`ask` or `deny`, never `allow`).

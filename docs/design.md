@@ -1,20 +1,20 @@
 # claude-mode-gate: design
 
-Updated 11 October 2026. Owner: Marcus Jellinghaus.
+Updated 28 November 2026. Owner: Marcus Jellinghaus.
 
 ## Summary
 
-mode-gate is a Claude Code mod that limits what Claude may do. A fixed **baseline** allows read access and a few project writes. Named **profiles** add more rules (allow, ask, deny). The user switches profiles on and off with one command. Bash that no active rule allows asks. For other tools the mod adds only its own rules and guards; Claude Code's own verdict applies to the rest.
+mode-gate is a Claude Code mod that limits what Claude may do. An always-on **baseline** is the user's own: `/gate-setup` builds it from their Claude Code allow rules, and until then the mod blocks nothing. Named **profiles** add more rules (allow, ask, deny). The user switches profiles on and off with one command. Bash that no active rule allows asks. For other tools the mod adds only its own rules and guards; Claude Code's own verdict applies to the rest.
 
 The design is agreed. Nothing is built yet. The mods API has been checked against Claude Code 2.1.292 (see [mods-api-notes.md](mods-api-notes.md)); the verification spike (Draft 01) has recorded the status of every row in [Assumptions](#assumptions). The rows that need an interactive terminal stay open for the owner.
 
-Repo description: A Claude Code mod with switchable permission profiles: a safe baseline and named profiles you switch on and off. Bash that no active rule allows asks. For other tools the mod adds only its own rules and guards; Claude Code's own verdict applies to the rest.
+Repo description: A Claude Code mod with switchable permission profiles: a baseline you set up and named profiles you switch on and off. Bash that no active rule allows asks. For other tools the mod adds only its own rules and guards; Claude Code's own verdict applies to the rest.
 
 ## Goals and non-goals
 
 Goals, in priority order:
 
-1. **Limited access by default.** Read access (including running checks and tests) plus a few write tools that the mcp-workspace server confines to the project folder. Git restores tracked files; deleting or overwriting an untracked file cannot be undone.
+1. **Limited access, chosen by the user.** The baseline holds what the user always allows, started from their existing Claude Code allow rules. Nothing is blocked before the user has set it up.
 2. **Profiles.** The user switches named profiles on and off. Several can be active at once.
 3. **Simple, visible control.** One command per action. The active profiles are always visible.
 4. **Guard against mistakes and prompt injection.** Bash needs manual approval unless a rule allows that call. Nothing is allowed by default beyond the baseline. The mod is not a defence against an adversary who can write code and run it (see [Threat model](#threat-model)).
@@ -39,7 +39,7 @@ The mod guards against **mistakes** (a model that wanders off or picks the wrong
 
 ## Concepts
 
-- **Baseline.** Always-on allow rules (see below). Its asks and denies (protected paths and risky files) are path guards, not rules.
+- **Baseline.** The always-on rules (see below). The mod ships a default; a top-level `baseline` in the user file replaces it whole, with no merging. The path guards (protected paths deny, risky files ask) apply on top of it either way.
 - **Profile.** A named bundle with a description and three rule lists: `allow`, `ask` and `deny`. The same shape as the `permissions` block in `settings.json`. A profile that only has `deny` entries is a restriction, for example a read-only profile.
 - **Delegable.** A boolean per profile, default `true`. A non-delegable profile cannot be handed to a subagent.
 - **Active set.** The baseline plus the profiles that are switched on.
@@ -49,43 +49,53 @@ The mod guards against **mistakes** (a model that wanders off or picks the wrong
 
 Three layers:
 
-1. The **baseline** is built into the mod and cannot be overridden.
-2. **Built-in profiles** (`git-write`, `issues`) ship with the mod and work with no config file.
+1. The **baseline** is the user file's `baseline` if present, else the shipped default.
+2. Two **built-in profiles**, `git-write` and `issues`, ship with the mod (`hooks/builtin-profiles.ts`).
 3. The **user file** adds profiles and may replace a built-in by reusing its name. The whole definition wins, with no merging.
 
-The user file is JSON at `$XDG_CONFIG_HOME/mode-gate/config.json`, falling back to `~/.config/mode-gate/config.json` on all platforms, Windows included. `MODE_GATE_CONFIG` overrides the path, mainly for tests and headless runs. The mod reads the environment through `$.env.get("NAME")` with literal names only (`MODE_GATE_PROFILES`, `MODE_GATE_CONFIG`, `XDG_CONFIG_HOME`, `HOME`, `USERPROFILE`); the home folder is `HOME`, else `USERPROFILE`. An empty-string value counts as unset for `MODE_GATE_CONFIG`, `XDG_CONFIG_HOME`, `HOME` and `USERPROFILE`. The shape is `{ "logDir": "logs", "profiles": { "<name>": { "description", "delegable", "allow", "ask", "deny" } } }`. `logDir` is optional (default `logs`). A JSON Schema, `mode-gate.schema.json`, ships in the repo, and users reference it with `$schema`.
+The user file is JSON at `$XDG_CONFIG_HOME/mode-gate/config.json`, falling back to `~/.config/mode-gate/config.json` on all platforms, Windows included. `MODE_GATE_CONFIG` overrides the path, mainly for tests and headless runs. The mod reads the environment through `$.env.get("NAME")` with literal names only (`MODE_GATE_PROFILES`, `MODE_GATE_CONFIG`, `XDG_CONFIG_HOME`, `HOME`, `USERPROFILE`); the home folder is `HOME`, else `USERPROFILE`. An empty-string value counts as unset for `MODE_GATE_CONFIG`, `XDG_CONFIG_HOME`, `HOME` and `USERPROFILE`. The shape is `{ "logDir": "logs", "baseline": { "allow": [], "ask": [], "deny": [] }, "profiles": { "<name>": { "description", "delegable", "allow", "ask", "deny" } } }`. `logDir` is optional (default `logs`). The baseline has no `description` and no `delegable`. A JSON Schema, `mode-gate.schema.json`, ships in the repo, and users reference it with `$schema`.
 
-A project may contain `.mode-gate.json` at its root, in the same shape. Its profiles are proposals and are never active. In the loaded config, `profiles` is a `Record<string, Profile>` keyed by profile name (the loader sets `Profile.name` from the key, so the two cannot differ) and the proposals are a second `Record<string, Profile>`. `/gate-check` lists them. The user adopts one by copying it into their own config by hand. Across active profiles, deny beats ask beats allow, whatever the source. An invalid config fails closed: only the baseline is active (starting profiles included: they are informational then, never activated), and the errors are shown.
+A project may contain `.mode-gate.json` at its root, in the same shape. Its profiles are proposals and are never active. In the loaded config, `profiles` is a `Record<string, Profile>` keyed by profile name (the loader sets `Profile.name` from the key, so the two cannot differ) and the proposals are a second `Record<string, Profile>`. `/gate-check` lists them. The user adopts one by copying it into their own config by hand. Across active profiles, deny beats ask beats allow, whatever the source. A `baseline` or `logDir` in a project `.mode-gate.json` is ignored with a warning. An invalid config fails closed: the mod stays active with no profiles and an empty baseline (all three lists empty, never the default, so a broken setup cannot widen a baseline the user narrowed), `startProfiles` is always `[]`, and the errors are shown.
+
+**Not set up.** With no user file at the path in use, the shipped default baseline applies and the built-in profiles can be switched on; a missing file is not an error. The path guards of [Protected paths](#protected-paths) apply as always (so Claude cannot write the mod a permissive config), and the band shows `mode-gate: not set up — run /gate-setup`. This holds in headless runs too.
 
 ### Baseline
 
-Always on:
+The baseline is the always-on rule set, in the same `allow`, `ask` and `deny` shape as a profile. This section describes the **shipped default** in `hooks/baseline.ts`. It allows:
 
-- **Reads:** the mcp-workspace read tools (`read_file`, `list_directory`, `search_files`, the reference-project tools, read-only `git`, `check_*`) and the GitHub reads `github_issue_view`, `github_issue_list`, `github_pr_view` and `github_search`. `github_label_list` and `github_subissue_list` are not in the baseline; they belong to the `issues` profile.
-- **Writes:** `edit_file`, `save_file`, `append_file`, `move_file`, `delete_this_file`, `delete_directory`. The mcp-workspace server confines them to the project folder. Protected paths still deny and risky files ask (path guards, below). Git restores tracked files; deleting or overwriting an untracked file cannot be undone.
-- **Checks:** the exact scripts `npm run check`, `typecheck`, `lint`, `format`, `format:check`, `test`, `test:coverage`, `test:mutation`, `arch`, `deadcode`, `docs:lint`, `check:manifests`, `check:catch`, `check:pins`, `check:docs` and `audit` (sixteen exact rules, each `Bash(npm run <name>)`; no prefix rule covers the `check:` scripts), plus the prefix `npm run test -- *` so a test loop such as `npm run test -- tests/x.test.ts` does not ask each run. The arguments after `--` are not restricted.
-- **Other tools:** Skill, Agent, web fetch and web search. A fetched URL or a search query can leak data, and fetched pages can carry injected instructions. The baseline accepts this.
-- **Ask (path guard):** edits to `package.json`, `scripts/`, the tool configs and the other files listed under [Protected paths](#protected-paths), because the allowed `npm run` scripts execute or read them.
-- **Deny (path guard):** the protected paths.
+- the mcp-workspace read tools `read_file`, `list_directory`, `search_files`, `read_reference_file`, `list_reference_directory`, `search_reference_files`, `get_reference_projects`, `git`, `github_issue_list`, `github_pr_view`, `github_search`, `check_branch_status`, `check_file_size` and `get_base_branch`;
+- the mcp-workspace write tools `edit_file`, `save_file`, `append_file`, `move_file`, `delete_this_file` and `delete_directory` (the server confines writes to the project folder);
+- Skill, Agent, WebFetch and WebSearch;
+- the sixteen `npm run` check scripts as exact rules, plus `npm run test -- *`.
 
-The baseline has no ask or deny rules. `npm ci` and `npm install` run install scripts and are not allowed by any rule, so they ask through the Bash downgrade (an unmatched Bash call asks, see [Decision order](#decision-order)). A Claude Code allow such as `Bash(npm ci)` in `settings.json` is still downgraded to ask while the mod is active, so the README must say that the mod asks for them and that `settings.json` allows do not override this.
+`github_issue_view` is not in the default because its `body_file` writes a project file, which the path guards don't cover. It belongs to the `issues` profile. The default baseline has no ask or deny rules; a user `baseline` may have them.
 
-The path guards are implemented in Draft 05, not as profile rules: the v1 rule grammar has only whole-tool and Bash rules, so it cannot say "edit tool, but only for this path".
+A user `baseline` replaces the default whole. A useful one names the user's own tools (their MCP servers, their check scripts), which the mod can neither know nor judge: listing the available tools does not tell which ones are safe.
 
-Not in the baseline: git writes (`add`, `commit`, `push`, `checkout -b`). A `git-write` profile allows `git add`, `git commit` and `git checkout -b` as prefix rules, and `git push` only in the exact form `git push` (new branches need `git config push.autoSetupRemote true`). The v1 grammar cannot deny `--force` without over-matching (no mid-string `*`), nor allow a push prefix without letting `--force` through, so every other push asks, force pushes and `git push -u origin HEAD` included. Globs in deny and ask rules (see [Later](#later)) would allow a real force-push deny and wider push forms. Both built-in profiles are delegable. All other Bash asks.
+**`/gate-setup`** (Draft 14) builds a starter from the user's Claude Code allow rules, so the user starts from what they already allow. It shows the result and the rules it left out (those the v1 grammar cannot express, and over-broad ones), and writes the file only on `/gate-setup write`. Rules from the user's own settings go into the baseline. Rules from the project's settings, which a repo can write, become a suggested profile instead, because the user file applies to every project.
+
+A Claude Code Bash allow counts for the mod only once it is in the baseline or an active profile; otherwise the call asks through the Bash downgrade (see [Decision order](#decision-order)). `npm ci` and `npm install` therefore ask unless the user keeps them in the baseline. For other tools without a rule, Claude Code's own verdict stands.
+
+The path guards (Draft 05) are not rules: the v1 grammar has only whole-tool and Bash rules, so it cannot say "edit tool, but only for this path". Protected paths deny and risky files ask whatever the baseline holds.
+
+**Example.** `examples/config.json` holds this repo's own baseline: the mcp-workspace read and write tools (the server confines writes to the project folder), the GitHub reads, the sixteen `npm run` check scripts as exact rules plus `npm run test -- *`, and Skill, Agent, web fetch and web search. It also holds the `issues` profile for the mcp-workspace GitHub writes.
+
+Git writes (`add`, `commit`, `push`, `checkout -b`) are in no baseline. The built-in `git-write` profile allows `git add`, `git commit` and `git checkout -b` as prefix rules, and `git push` only in the exact form `git push` (new branches need `git config push.autoSetupRemote true`). The v1 grammar cannot deny `--force` without over-matching (no mid-string `*`), nor allow a push prefix without letting `--force` through, so every other push asks, force pushes and `git push -u origin HEAD` included. Globs in deny and ask rules (see [Later](#later)) would allow a real force-push deny and wider push forms. `git-write` is delegable. All other Bash asks.
 
 ### Decision order
 
-Claude Code's own verdict for the call arrives from `next(e)` in the `tool.check` hook as `{ decision, reason, rule }`. The engine lets a hook answer in either direction, so the mod could override a deny. It must not: **a deny from Claude Code is returned unchanged** (source `claude-code`), before the steps below.
+Claude Code's own verdict for the call arrives from `next(e)` in the `tool.check` hook as `{ decision, reason, rule, setting, hook, plugin }`. The engine lets a hook answer in either direction, so the mod could override a deny. It must not: **a deny from Claude Code is returned unchanged** (source `claude-code`), before the steps below. An unknown `decision` (anything but exactly `allow`, `ask` or `deny`, a missing one included) is never passed through: it is handled like malformed input after the denies, so any matching deny still wins.
 
 Otherwise the first rule that matches wins:
 
 1. A subagent calls Bash and holds no rule for it: deny, with the redirect message.
-2. A covered write tool targets a protected path: deny.
+2. A `deny` guard result (protected paths; an invalid subagent assignment): deny.
 3. Across the active set, deny beats ask beats allow. Malformed input (a Bash call without a string `command`, a call without a tool name) sits here after the denies: a matching whole-tool deny or a deny guard result still wins, otherwise the result is an ask with source `malformed`.
 4. A call that matches nothing keeps Claude Code's own verdict.
 
 An allow from Claude Code is downgraded to ask for Bash (source `bash-downgrade`) unless an active rule allows the call. An active allow rule overrides a Claude Code ask, never a deny. "Holds no rule" in step 1 means that no active allow rule matches the call. A call is a subagent call when the event carries an agent id (see [Subagents](#subagents)).
+
+An allow rule overrides only a plain Claude Code ask. An ask that carries `setting`, `hook` or `plugin` (present, the empty string included) is passed through instead; deny rules and deny guard results still win, and ask rules still ask. An ask from a tool's own check carries none of the three and stays overridable, a documented limit.
 
 The `tool.call` hook cannot ask Claude Code (calling `next` there runs the tool), and `/gate-explain` is a dry run. Both decide with a stand-in Claude Code verdict of `allow` and are documented as such: `tool.call` only ever returns a deny, so the stand-in cannot loosen anything.
 
@@ -97,9 +107,10 @@ The path guards are extra sources fed into this order, not overrides: a protecte
 
 - Tools match by name and, later, by argument. Version 1 uses whole-tool rules only for non-Bash tools.
 - Bash rules are exact or trailing-` *` prefix rules (a subset of Claude Code's syntax; a trailing `:*` is parsed as ` *`). Matching uses string operations only and never builds a regular expression from rule text, so `.`, `+`, `(`, `[`, `^` and `$` in a rule are literal. **Allow rules are strict**: exact equality or `startsWith`, and never a match if the command contains any Bash metacharacter. Anything unusual asks. The metacharacters are the exported constant `BASH_METACHARACTERS` in `hooks/policy.ts` (defined in Draft 03; ten entries including the newline; the backslash is not one).
-- **Deny rules and profile ask rules use a boundary-checked substring test**, with or without metacharacters. The rule text (prefix with trailing whitespace trimmed, or the exact command text) must appear in the command after the start, whitespace or a metacharacter, and before whitespace, a metacharacter or the end. "Whitespace" here is JavaScript `\s` (tab, CR, VT, FF, NBSP and the other Unicode spaces count), the safe direction because more commands fire; allow prefixes stay a literal space. Every occurrence is tested, and one valid occurrence is enough. Both tests apply to every rule, with no exception. An empty prefix always matches. So `deny Bash(git push *)` fires on `git push`, `git push<TAB>origin`, `x;git push`, `git push&&y` and `xgit push; git push`, but not on `git pushd`; `deny Bash(rm -rf /)` fires on `rm -rf / b` and `a; rm -rf /`, but not on `rm -rf /tmp`. A plain `startsWith("git push ")` would miss the bare forms and make the deny inert. A quote, a backslash, `/` and `=` are not boundaries, so `bash -c "git push"`, `sh -c 'git push'`, `/usr/bin/git push`, `\git push`, `git  push` and `git -C . push` do not trigger the deny. These are known bypasses that degrade to an ask through the Bash downgrade, never to an allow, and the matcher is deliberately not widened.
+- **Deny rules and ask rules use a boundary-checked substring test**, with or without metacharacters. The rule text (prefix with trailing whitespace trimmed, or the exact command text) must appear in the command after the start, whitespace or a metacharacter, and before whitespace, a metacharacter or the end. "Whitespace" here is JavaScript `\s` (tab, CR, VT, FF, NBSP and the other Unicode spaces count), the safe direction because more commands fire; allow prefixes stay a literal space. Every occurrence is tested, and one valid occurrence is enough. Both tests apply to every rule with a non-empty text. The one exception is an empty rule text (`deny Bash(*)`, `ask Bash(*)`), which matches every string command. So `deny Bash(git push *)` fires on `git push`, `git push<TAB>origin`, `x;git push`, `git push&&y` and `xgit push; git push`, but not on `git pushd`; `deny Bash(rm -rf /)` fires on `rm -rf / b` and `a; rm -rf /`, but not on `rm -rf /tmp`. A plain `startsWith("git push ")` would miss the bare forms and make the deny inert. A quote, a backslash, `/` and `=` are not boundaries, so `bash -c "git push"`, `sh -c 'git push'`, `/usr/bin/git push`, `\git push`, `git  push` and `git -C . push` do not trigger the deny. These are known bypasses that degrade to an ask through the Bash downgrade, never to an allow, and the matcher is deliberately not widened.
 - The redirect text of the step-1 deny comes from `redirectHint` in `hooks/guards.ts`; `gate.ts` adds it to the hook result, `decide` does not build it.
 - A whole-tool `Bash` rule matches every Bash call.
+- Whole-tool rules: `*` matches every tool, and plain names match exactly. An allow `mcp__<server>` (no further `__`) matches every tool starting with `mcp__<server>__`. A deny or ask rule `mcp__x__y` matches the tool `mcp__x__y` and every tool starting with `mcp__x__y__`, because a server name may contain `__`; an allow rule `mcp__x__y` matches only that name.
 - Issue and GitHub work uses the typed mcp-workspace tools, not Bash text.
 
 ## Commands
@@ -108,10 +119,11 @@ The path guards are extra sources fed into this order, not overrides: a protecte
 | ------------------------ | ---------------------------------------------------------------------------------------------- |
 | `/gate-on <profile>...`  | Switch profiles on. Prints a short summary of what they allow.                                 |
 | `/gate-off <profile>...` | Switch profiles off. `all` switches every profile off.                                         |
-| `/gate-status`           | Baseline summary, active profiles, config path in use, and `log: failing` if writes fail.      |
+| `/gate-status`           | Baseline summary (or `not set up`), active profiles, config path, `log: failing` if it fails.  |
 | `/gate-why [n]`          | The last n verdicts with the rule and profile that fired.                                      |
 | `/gate-check`            | Validate the config: conflicts, unknown tools, over-broad rules. Also lists project proposals. |
 | `/gate-explain <tool> …` | Dry run one call and show the verdict and the rule chain.                                      |
+| `/gate-setup [write]`    | Show a starter config built from your Claude Code allow rules; `write` saves it.               |
 
 Commands are registered with `$.command.register({ name, description, argumentHint?, immediate? })` in the `session.start` hook and served by `command.run` hooks. The hook gets the raw argument text in `e.args` and returns `{ text?, context?, exitCode? }`.
 
@@ -206,7 +218,9 @@ A module that fails to load registers no hooks, so nothing is gated (assumption 
 - `gate.ts`: the shared decide path used by `tool.call` and `tool.check`, plus the pure event normalisers `callFromToolCall(e)` and `callFromToolCheck(e)`. `tool.call` spreads the tool's arguments beside `tool`, `tool_use_id` and `agentId` (`e.command` for Bash); `tool.check` nests them as `e.input`. Both normalisers return the same `call` object `{ toolName, input, agentId?, toolCallId? }`. The path imports `policy.ts`, holds `profileHint(decision, call)` (it needs `decide`) and takes the effective set (a function of the call returning `RuleSet[]`), guards, `redirectHint`, `availableProfiles(call)`, `log`, a `hook` kind (`call` or `check`; the path calls `log` after the verdict is computed, for `call` only on a deny), the `headless` flag and Claude Code's verdict by injection. It uses no `$` and does no I/O. `/gate-explain` injects the same functions, so it shows the same denial text. Only `/gate-explain` passes `withChain`; the live hooks never build the rule chain. The effective set comes from a pure helper in `assignment.ts`; the live closure over `$.state` wraps it, and explain calls it with explicit lists. `decide` has the signature `decide({ call, sets, guards, claude, withChain? }): Decision` with `sets: RuleSet[]`; the types `Rule`, `Profile`, `RuleSet`, `Call`, `GuardResult`, `ClaudeVerdict` and `Decision` are exported from `policy.ts`.
 - Result shapes. `tool.call` returns `{ deny: message }` or the result of `next(e)`; `tool.check` returns `{ decision, reason?, rule? }`. `gate.ts` returns `{ verdict, message? }`, and `register.ts` maps it.
 - `guards.ts`: pure path guards (with resolved symlink paths as an input) and `redirectHint`. No runtime imports; type imports from `policy.ts` are allowed (it returns `GuardResult`), so the dependency-cruiser rule needs `tsPreCompilationDeps: true` to see them. Under the coverage, mutation and purity gates.
-- `config.ts`: config loader and validator. It imports only `baseline.ts`, `builtin-profiles.ts` and types from `policy.ts`; same gates as `guards.ts`.
+- `config.ts`: config loader and validator, including the `baseline` key. It imports only `baseline.ts`, `builtin-profiles.ts` and `policy.ts`. From `policy.ts` that is the types plus `decide` at runtime, for the "covers" check, so the validator and `decide` cannot disagree. Same gates as `guards.ts`.
+- `baseline.ts` and `builtin-profiles.ts`: the shipped default baseline and built-in profiles as raw rule strings. They import nothing at runtime.
+- `setup.ts`: pure. Turns the Claude Code allow rules per settings source into the starter config, the left-out rules with reasons and the `/gate-setup` preview text. Imports only `config.ts` and types from `policy.ts`; same gates as `guards.ts`.
 - `assignment.ts`: the four pure functions `parseAssignmentMarker`, `checkAssignment`, `effectiveSet` (returns `RuleSet[]`) and `revoke(gate, names)`, nothing else (`profileHint` lives in `gate.ts`). No runtime imports (type imports from `policy.ts` are allowed); same gates as `guards.ts`.
 - `explain.ts`: pure text of a decision and its chain, with the exactness notes. It imports only types from `policy.ts` (the decision type is one of them), and sits under the same coverage, mutation and purity gates as `guards.ts`.
 - `commands.ts`: pure logic of the profile state and commands: the start and reset transitions, `/gate-on`, `/gate-off`, the `/gate-status` text, all-or-nothing name validation, reserved names, proposal hints and usage text. It returns the new state or active list and the message; `register.ts` stores it and prints the message. Imports only types from `policy.ts` and `config.ts` (the `loadConfig` result held in `gate.config`); same gates as `guards.ts`.
@@ -221,6 +235,7 @@ A module that fails to load registers no hooks, so nothing is gated (assumption 
 | Event           | What the hook does                                                                            |
 | --------------- | --------------------------------------------------------------------------------------------- |
 | `session.start` | Stores `isInteractive`, starts the state once, applies starting profiles, registers commands. |
+|                 | No config file means not set up: the tool hooks then apply only the protected-path denies.    |
 | `session.end`   | Resets the state (the way `/clear` is seen).                                                  |
 | `command.run`   | Switches profiles and redraws the band. Commands are registered with `immediate: true`.       |
 | binding event   | Binds a pending assignment record to the new subagent id (event and matcher from row 10).     |
@@ -233,9 +248,10 @@ A module that fails to load registers no hooks, so nothing is gated (assumption 
 ```text
 claude-mode-gate/
   .claude-plugin/   plugin.json, marketplace.json
-  hooks/            hooks.json, register.ts, gate.ts, policy.ts, config.ts, baseline.ts,
+  hooks/            hooks.json, register.ts, gate.ts, policy.ts, config.ts,
                     builtin-profiles.ts, guards.ts, assignment.ts, commands.ts,
-                    log-format.ts, explain.ts
+                    log-format.ts, explain.ts, setup.ts
+  examples/         config.json (this repo's baseline and the issues profile)
   types/            index.d.ts
   tests/            unit tests, fixtures/
   docs/             design.md, mods-api-notes.md
@@ -244,7 +260,7 @@ claude-mode-gate/
 
 ## Testing
 
-See `.claude/CLAUDE.md`, "Testing strategy". Logic tests run on the pure modules (`gate.ts` with injected dependencies). Wiring tests run through the plugin test kit (`claude-code/testing` and `claude plugin test`), which loads the module from the manifest: `tests/` never imports `register.ts` (the `no-import-of-register` rule covers tests too). Spike row 4 showed the kit can do this: a test raises `tool.check` with `$.tool.check`, answers the plugin's `$.fs` and `$.state` calls with `on("fs.stat", () => ({ value }))` and the like, and `mock` covers `clock`, `store` and `env`. No `tests/wiring/**` exception is needed. The kit cannot list the hooks a plugin registered, so Draft 07's single-`session.start` test reads the hooks list in `claude plugin validate` output instead. Policy tests are table-driven and cover the decision order, chained and substituted Bash, protected paths, fail-closed behaviour and the reset after `/clear`.
+See `.claude/CLAUDE.md`, "Testing strategy". Logic tests run on the pure modules (`gate.ts` with injected dependencies). Wiring tests run through the plugin test kit (`claude-code/testing` and `claude plugin test`), which loads the module from the manifest: `tests/` never imports `register.ts` (the `no-import-of-register` rule covers tests too). Spike row 4 showed the kit can do this: a test raises `tool.check` with `$.tool.check`, answers the plugin's `$.fs` and `$.state` calls with `on("fs.stat", () => ({ value }))` and the like, and `mock` covers `clock`, `store` and `env`. No `tests/wiring/**` exception is needed. The kit cannot list the hooks a plugin registered, so Draft 07's single-`session.start` test reads the hooks list in `claude plugin validate` output instead. Policy tests are table-driven and cover the decision order and Bash matching (chained and substituted commands included) and fail toward ask on unknown input. Protected paths are tested with the guards (Draft 05), the reset after `/clear` with the wiring.
 
 ## Security model
 
@@ -253,6 +269,8 @@ The rule is that only the user changes profiles, and the mod never returns a ver
 | Route                                     | Risk                                            | How it is closed                                                                                                                                                                                                                                                                        |
 | ----------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Claude switches a profile itself          | Claude widens its own permissions               | Commands are for the user. The mod registers no tool for switching.                                                                                                                                                                                                                     |
+| The mod is not set up                     | Only Claude Code's own rules gate the calls     | By design: the user chooses first. The band says `not set up`, and the protected-path denies stay, so Claude cannot write the mod a config.                                                                                                                                             |
+| A repo's settings feed the baseline       | A repo widens the user's global baseline        | `/gate-setup` puts project-settings rules into a suggested profile, never into the baseline, and the user reviews the file before it is written.                                                                                                                                        |
 | Claude edits the mod's config or install  | The installed copy is rewritten                 | Protected-paths deny on the covered write tools. The working-tree `hooks/`, `tests/` and `types/` are unprotected on purpose.                                                                                                                                                           |
 | Claude writes code and runs it            | Any code runs under an allowed `npm run` script | Not closed. Out of the threat model (see above): the mod guards mistakes and prompt injection, not a code-writing adversary.                                                                                                                                                            |
 | Claude sets the environment variable      | The profile set changes mid-session             | Not possible: the variable is read once, and a child cannot change its parent.                                                                                                                                                                                                          |
@@ -326,16 +344,16 @@ Minimum Claude Code version: 2.1.292, the version the notes were verified agains
 
 ### Impact on the drafts
 
-| Draft                      | Rows          | Impact                                                                                                                                                                                                               |
-| -------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 02 Config                  | 8, 16, 22     | Apply finding 1. One hooks module (`register.ts`) with sibling imports as `./x.ts`. Windows env values verified; if `HOME` and `USERPROFILE` are both unset it fails closed. macOS and Linux are open for the owner. |
-| 04 State and commands      | 24            | May use `set(..., { ifVersion })` or `update`; the re-read-then-set rule stays valid.                                                                                                                                |
-| 05 Guards                  | 25, 26, 27    | Findings 4 and 5. Anchors for relative paths: `MCP_CODER_PROJECT_DIR`, `$.session.root()`, `$.session.cwd()`. `realPath` expands 8.3 names, so the `~digit` ask is a backstop for unresolved paths.                  |
-| 06 Subagent profiles       | 2, 10, 11, 21 | Bind in `on("agent.spawn")`; no matcher. A `bypassPermissions` agent is gated like any other, so nothing stops. Any `agentId` counts as a subagent.                                                                  |
-| 07 Band, log               | 2, 4, 13, 19  | Band stays above the prompt (optionally `$.ui.status`). `$.fs.write` raises no tool event. The single-`session.start` test reads `claude plugin validate` output, because the kit cannot list registrations.         |
-| 10 Housekeeping            | 18, 23        | `claude plugin validate` and `claude plugin test` need no login and no secret in CI. `claude plugin validate --strict` passes on this repo, so CI can use `--strict`.                                                |
-| 12 Shared path, tool hooks | 4, 19         | No `tests/wiring/**` exception. The re-entry branch stays as a no-op. A `tool.call` deny means no `tool.check`.                                                                                                      |
-| 13 README, SECURITY.md     | 8, 18         | Say that a repo's settings `env` is not trusted for `MODE_GATE_*`, and that a module that fails to load leaves everything ungated.                                                                                   |
+| Draft                      | Rows          | Impact                                                                                                                                                                                                                                                                                                             |
+| -------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 02 Config                  | 8, 16, 22     | Apply finding 1. One hooks module (`register.ts`) with extensionless or `./x.js` sibling imports, not `./x.ts`, because `tsconfig.json` doesn't set `allowImportingTsExtensions`. Windows env values verified; if `HOME` and `USERPROFILE` are both unset it fails closed. macOS and Linux are open for the owner. |
+| 04 State and commands      | 24            | May use `set(..., { ifVersion })` or `update`; the re-read-then-set rule stays valid.                                                                                                                                                                                                                              |
+| 05 Guards                  | 25, 26, 27    | Findings 4 and 5. Anchors for relative paths: `MCP_CODER_PROJECT_DIR`, `$.session.root()`, `$.session.cwd()`. `realPath` expands 8.3 names, so the `~digit` ask is a backstop for unresolved paths.                                                                                                                |
+| 06 Subagent profiles       | 2, 10, 11, 21 | Bind in `on("agent.spawn")`; no matcher. A `bypassPermissions` agent is gated like any other, so nothing stops. Any `agentId` counts as a subagent.                                                                                                                                                                |
+| 07 Band, log               | 2, 4, 13, 19  | Band stays above the prompt (optionally `$.ui.status`). `$.fs.write` raises no tool event. The single-`session.start` test reads `claude plugin validate` output, because the kit cannot list registrations.                                                                                                       |
+| 10 Housekeeping            | 18, 23        | `claude plugin validate` and `claude plugin test` need no login and no secret in CI. `claude plugin validate --strict` passes on this repo, so CI can use `--strict`.                                                                                                                                              |
+| 12 Shared path, tool hooks | 4, 19         | No `tests/wiring/**` exception. The re-entry branch stays as a no-op. A `tool.call` deny means no `tool.check`.                                                                                                                                                                                                    |
+| 13 README, SECURITY.md     | 8, 18         | Say that a repo's settings `env` is not trusted for `MODE_GATE_*`, and that a module that fails to load leaves everything ungated.                                                                                                                                                                                 |
 
 Rows left `open` or `partly verified` and their fallbacks: row 4 (no list of registrations: use the `validate` output), row 14 (usage text lists the profile names), row 20 (`/clear` and resume need an interactive terminal: the reset in `session.end` and `$.session.id()` on each use stay as designed), row 22 (macOS and Linux unrun: fail closed without a home folder), row 26 (anchors above; a server rooted elsewhere is a known gap).
 
@@ -383,9 +401,9 @@ The source is in the [`mods/sec-default` directory](https://github.com/anthropic
 
 ## Work plan
 
-Thirteen issues, #3 to #15 (Drafts 01 to 13), tracked by the overview issue #16. "Draft NN" in this document names the issue with that plan id.
+Fourteen issues, #3 to #15 and #50 (Drafts 01 to 14), tracked by the overview issue #16. "Draft NN" in this document names the issue with that plan id.
 
 1. **Verify.** Draft 01: the small spike over the open rows of [Assumptions](#assumptions), the manifest shape, and how `typecheck` gets the engine's types. Done on 11 October 2026.
-2. **Build.** `policy.ts` with `decide` and tests first (03), then the config (02), the state and commands (04), the shared path and hook wiring (12), the guards (05), subagent profiles (06), the band and log (07), `/gate-explain` (08) and the built-in profiles (09).
+2. **Build.** `policy.ts` with `decide` and tests first (03), then the config (02), the state and commands (04), the shared path and hook wiring (12), `/gate-setup` (14), the guards (05), subagent profiles (06), the band and log (07), `/gate-explain` (08) and the built-in profile with the example config (09).
 3. **Test.** Policy tables, protected paths, fail-closed, reset after `/clear`, band, CI with `claude plugin validate` and `claude plugin test` (10).
 4. **Publish.** README with "what it can reach" and "what it allows", SECURITY.md (13), CHANGELOG, licence, topics, awesome-list submission, repo settings (11).

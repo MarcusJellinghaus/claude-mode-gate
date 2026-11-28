@@ -34,9 +34,31 @@ module.exports = {
       from: { path: "^hooks/" },
       to: { dependencyTypes: ["npm-dev"] },
     },
+    {
+      name: "data-files-import-only-policy",
+      comment:
+        "baseline.ts and builtin-profiles.ts hold data: they may import only types from policy.ts.",
+      severity: "error",
+      from: { path: "^hooks/(baseline|builtin-profiles)\\.ts$" },
+      to: { pathNot: "^hooks/policy\\.ts$" },
+    },
+    {
+      name: "data-files-no-runtime-imports",
+      severity: "error",
+      from: { path: "^hooks/(baseline|builtin-profiles)\\.ts$" },
+      to: { dependencyTypesNot: ["type-only"] },
+    },
+    {
+      name: "config-imports-only-its-modules",
+      comment: "config.ts may import only policy.ts, baseline.ts and builtin-profiles.ts.",
+      severity: "error",
+      from: { path: "^hooks/config\\.ts$" },
+      to: { pathNot: "^hooks/(baseline|builtin-profiles|policy)\\.ts$" },
+    },
   ],
   options: {
     tsConfig: { fileName: "tsconfig.json" },
+    tsPreCompilationDeps: true,
     doNotFollow: { path: "node_modules" },
   },
 };
