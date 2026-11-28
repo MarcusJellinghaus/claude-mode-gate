@@ -3,9 +3,10 @@ import { BASH_METACHARACTERS, decide } from "../hooks/policy";
 import { BASH_CHAIN_ROWS, BASH_TABLE } from "./fixtures/policy/bash";
 import type { ChainRow, Row } from "./fixtures/policy/builders";
 import { CORE_CHAIN_ROWS, CORE_TABLE } from "./fixtures/policy/core";
+import { SUBAGENT_CHAIN_ROWS, SUBAGENT_TABLE } from "./fixtures/policy/subagent";
 
-const ROWS: Row[] = [...CORE_TABLE, ...BASH_TABLE];
-const CHAIN_ROWS: ChainRow[] = [...CORE_CHAIN_ROWS, ...BASH_CHAIN_ROWS];
+const ROWS: Row[] = [...CORE_TABLE, ...BASH_TABLE, ...SUBAGENT_TABLE];
+const CHAIN_ROWS: ChainRow[] = [...CORE_CHAIN_ROWS, ...BASH_CHAIN_ROWS, ...SUBAGENT_CHAIN_ROWS];
 const SOURCES = ["rule", "guard", "subagent-bash", "bash-downgrade", "malformed", "claude-code"];
 
 const commandOf = (value: unknown): unknown =>

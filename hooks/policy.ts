@@ -86,14 +86,19 @@ export function decide(input: DecideInput): Decision {
   return chain === undefined ? decision : { ...decision, chain };
 }
 
-// First return wins: Claude Code deny, deny walk, malformed input, ask walk, allow walk,
-// then Claude Code's own verdict, where a Bash allow no rule holds is downgraded to an ask.
+// First return wins: Claude Code deny, unheld subagent Bash, deny walk, malformed input, ask
+// walk, allow walk, then Claude Code's own verdict, where a Bash allow no rule holds is
+// downgraded to an ask.
 function core(input: DecideInput, chain: ChainEntry[] | undefined): Decision {
   const { claude } = input;
   if (claude.decision === "deny") return fromClaude(claude, "deny");
   const name = toolNameOf(input.call);
   const command = commandOf(input.call.input);
   const malformed = name === undefined || (name === "Bash" && command === undefined);
+  if (name === "Bash" && input.call.agentId !== undefined) {
+    const unheld = subagentBash(input, name, command, malformed, chain);
+    if (unheld !== undefined) return unheld;
+  }
   const denied = walk("deny", input, name, command, chain);
   if (denied !== undefined) return denied;
   if (malformed || !isVerdict(claude.decision)) {
@@ -224,6 +229,35 @@ function walk(
     }
   }
   return undefined;
+}
+
+// A subagent runs Bash only where an allow rule holds the call: its asks reach no one who
+// could answer them. A protected Claude Code ask does not matter here; it decides later.
+function subagentBash(
+  input: DecideInput,
+  name: string,
+  command: string | undefined,
+  malformed: boolean,
+  chain: ChainEntry[] | undefined,
+): Decision | undefined {
+  const skipped: ChainEntry[] = [];
+  for (const set of input.sets) {
+    for (const rule of set.allow) {
+      const match = allowMatch(rule, name, command, malformed);
+      if (match === "hit") return undefined;
+      if (match === "meta") {
+        skipped.push({
+          step: 1,
+          cls: "allow",
+          text: rule.raw,
+          profile: set.name,
+          skipped: METACHARACTER,
+        });
+      }
+    }
+  }
+  chain?.push(...skipped);
+  return { verdict: "deny", source: "subagent-bash" };
 }
 
 // Under a protected ask every matching allow rule is recorded as skipped, so the chain shows
