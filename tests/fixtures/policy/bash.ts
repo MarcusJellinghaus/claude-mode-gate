@@ -4,10 +4,13 @@ import type { ChainRow, Lists, Row } from "./builders";
 import {
   ALLOW,
   ASK,
+  CHECK,
   CLAUDE_DENY,
   CLAUDE_DENY_DECISION,
   DOWNGRADE,
+  GIT_PUSH,
   MALFORMED,
+  MALFORMED_INPUTS,
   METACHARACTER_SKIP,
   NO_MATCH,
   PROTECTED_DECISION,
@@ -27,7 +30,7 @@ import {
 } from "./builders";
 
 // JSON.stringify shows tab, CR and newline as escapes; NBSP needs its own.
-const show = (command: string): string => JSON.stringify(command).replaceAll(" ", "\\u00A0");
+const show = (command: string): string => JSON.stringify(command).replaceAll("\u00A0", "\\u00A0");
 
 const bashRow = (
   verb: string,
@@ -60,12 +63,10 @@ const denyBash = (rule: Rule, command: string, fires: boolean): Row =>
 const askBash = (rule: Rule, command: string): Row =>
   bashRow(`ask ${rule.raw} asks for`, { ask: [rule] }, command, ruleDecision("ask", rule.raw));
 
-const CHECK = exact("npm run check");
 const ECHO = prefix("echo ");
 const GH_EDIT = prefix("gh issue edit ");
 const GIT_COMMIT = prefix("git commit ");
 const GIT_STATUS = prefix("git status ");
-const GIT_PUSH = prefix("git push ");
 const RM_ROOT = exact("rm -rf /");
 
 const ALLOW_ROWS: Row[] = [
@@ -101,7 +102,12 @@ const ALLOW_ROWS: Row[] = [
   allowBash(CHECK, "x; npm run check", false),
   allowBash(GIT_STATUS, "echo git status -s", false),
   allowBash(CHECK, "x npm run check", false),
-  allowBash(GIT_STATUS, "git status -s", false),
+  bashRow(
+    `allow ${GIT_STATUS.raw} does not take an NBSP for its literal space, so it downgrades`,
+    { allow: [GIT_STATUS] },
+    "git\u00A0status -s",
+    DOWNGRADE,
+  ),
   allowBash(whole("Bash"), "a && b", true),
   allowBash(whole("*"), "a && b", true),
   allowBash(prefix(""), "a && b", false),
@@ -184,7 +190,7 @@ const DENY_ROWS: Row[] = [
   denyBash(prefix("npm run check ", "Bash(npm run check:*)"), "x; npm run check:docs", false),
   denyBash(exact("npm run check:docs"), "a; npm run check:docs", true),
   denyBash(exact("npm run check:docs"), "npm run check", false),
-  ...["x\rgit push", "x git push", "git push origin", "x\tgit push"].map((command) =>
+  ...["x\rgit push", "x\u00A0git push", "git push\u00A0origin", "x\tgit push"].map((command) =>
     denyBash(GIT_PUSH, command, true),
   ),
   denyBash(prefix("grep a.b "), "grep a.b f", true),
@@ -215,6 +221,13 @@ const BYPASS_ROWS: Row[] = [
 ];
 
 const MAYBE: ClaudeVerdict = { decision: "maybe" };
+
+// A Bash rule applies to Bash only, even when another tool's input has a command field.
+const nonBashRow = (verb: string, lists: Lists): Row => ({
+  name: `${verb} ${CHECK.raw} does not touch a non-Bash tool with a command input`,
+  input: input(call("mcp__srv__run", { command: "npm run check" }), [set("baseline", lists)], ASK),
+  expected: NO_MATCH,
+});
 
 const MIXED_ROWS: Row[] = [
   bashRow(
@@ -256,6 +269,9 @@ const MIXED_ROWS: Row[] = [
     input: input(call("Read", { file_path: "x" }), [set("baseline", { deny: [rule] })], ASK),
     expected: NO_MATCH,
   })),
+  nonBashRow("allow", { allow: [CHECK] }),
+  nonBashRow("deny", { deny: [CHECK] }),
+  nonBashRow("ask", { ask: [CHECK] }),
   {
     name: "a Bash call skipped for a metacharacter is allowed by a whole-tool rule in a later set",
     input: input(bash("gh issue edit 1 && rm -rf ."), [
@@ -264,13 +280,6 @@ const MIXED_ROWS: Row[] = [
     ]),
     expected: ruleDecision("allow", "Bash", "git-write"),
   },
-];
-
-const MALFORMED_INPUTS: [string, unknown][] = [
-  ["{}", {}],
-  ["{ command: 42 }", { command: 42 }],
-  ["null", null],
-  ['"ls"', "ls"],
 ];
 
 const MALFORMED_BASH_ROWS: Row[] = MALFORMED_INPUTS.flatMap(([label, toolInput]): Row[] => {

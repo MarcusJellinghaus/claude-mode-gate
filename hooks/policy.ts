@@ -96,7 +96,7 @@ function core(input: DecideInput, chain: ChainEntry[] | undefined): Decision {
   const command = commandOf(input.call.input);
   const malformed = name === undefined || (name === "Bash" && command === undefined);
   if (name === "Bash" && input.call.agentId !== undefined) {
-    const unheld = subagentBash(input, name, command, malformed, chain);
+    const unheld = subagentBash(input, name, command, chain);
     if (unheld !== undefined) return unheld;
   }
   const denied = walk("deny", input, name, command, chain);
@@ -104,8 +104,7 @@ function core(input: DecideInput, chain: ChainEntry[] | undefined): Decision {
   if (malformed || !isVerdict(claude.decision)) {
     return { verdict: "ask", source: "malformed" };
   }
-  const ruled =
-    walk("ask", input, name, command, chain) ?? allowWalk(input, name, command, malformed, chain);
+  const ruled = walk("ask", input, name, command, chain) ?? allowWalk(input, name, command, chain);
   if (ruled !== undefined) return ruled;
   if (name === "Bash" && claude.decision === "allow") {
     return { verdict: "ask", source: "bash-downgrade" };
@@ -154,14 +153,13 @@ function matches(
 }
 
 // Allow is strict: the command must equal or start with the rule text verbatim, and a
-// metacharacter anywhere could chain a second command onto the allowed one.
+// metacharacter anywhere could chain a second command onto the allowed one. Malformed calls
+// never get here: core and subagentBash return before.
 function allowMatch(
   rule: Rule,
   name: string | undefined,
   command: string | undefined,
-  malformed: boolean,
 ): "hit" | "meta" | "miss" {
-  if (malformed) return "miss";
   if (rule.kind === "whole") return wholeMatches(rule, name, "allow") ? "hit" : "miss";
   if (name !== "Bash" || command === undefined) return "miss";
   const strict = rule.kind === "exact" ? command === rule.arg : command.startsWith(rule.arg);
@@ -233,17 +231,19 @@ function walk(
 
 // A subagent runs Bash only where an allow rule holds the call: its asks reach no one who
 // could answer them. A protected Claude Code ask does not matter here; it decides later.
+// No rule holds a call without a string command, not even allow Bash.
 function subagentBash(
   input: DecideInput,
   name: string,
   command: string | undefined,
-  malformed: boolean,
   chain: ChainEntry[] | undefined,
 ): Decision | undefined {
+  const denied: Decision = { verdict: "deny", source: "subagent-bash" };
+  if (command === undefined) return denied;
   const skipped: ChainEntry[] = [];
   for (const set of input.sets) {
     for (const rule of set.allow) {
-      const match = allowMatch(rule, name, command, malformed);
+      const match = allowMatch(rule, name, command);
       if (match === "hit") return undefined;
       if (match === "meta") {
         skipped.push({
@@ -257,7 +257,7 @@ function subagentBash(
     }
   }
   chain?.push(...skipped);
-  return { verdict: "deny", source: "subagent-bash" };
+  return denied;
 }
 
 // Under a protected ask every matching allow rule is recorded as skipped, so the chain shows
@@ -267,13 +267,12 @@ function allowWalk(
   input: DecideInput,
   name: string | undefined,
   command: string | undefined,
-  malformed: boolean,
   chain: ChainEntry[] | undefined,
 ): Decision | undefined {
   const protectedAsk = isProtectedAsk(input.claude);
   for (const set of input.sets) {
     for (const rule of set.allow) {
-      const match = allowMatch(rule, name, command, malformed);
+      const match = allowMatch(rule, name, command);
       if (match === "miss") continue;
       const entry: ChainEntry = { step: 3, cls: "allow", text: rule.raw, profile: set.name };
       if (match === "meta") {
@@ -293,8 +292,11 @@ function allowWalk(
 
 // An allow rule's server prefix holds only for a bare server ("mcp__srv"), so a server name
 // containing "__" is never widened into allowing another server's tools.
-function wholeMatches(rule: Rule, name: string | undefined, cls: Verdict): boolean {
-  if (rule.kind !== "whole") return false;
+function wholeMatches(
+  rule: Extract<Rule, { kind: "whole" }>,
+  name: string | undefined,
+  cls: Verdict,
+): boolean {
   if (rule.tool === "*") return true;
   if (name === undefined) return false;
   if (name === rule.tool) return true;

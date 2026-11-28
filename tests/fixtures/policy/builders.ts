@@ -36,6 +36,17 @@ export const prefix = (arg: string, raw = `Bash(${arg}*)`): Rule => ({
   arg,
   raw,
 });
+export const CHECK = exact("npm run check");
+export const GIT_PUSH = prefix("git push ");
+
+// Bash inputs that carry no string command.
+export const MALFORMED_INPUTS: [string, unknown][] = [
+  ["{}", {}],
+  ["{ command: 42 }", { command: 42 }],
+  ["null", null],
+  ['"ls"', "ls"],
+];
+
 export const set = (name: string, lists: Lists = {}): RuleSet => ({
   name,
   allow: lists.allow ?? [],

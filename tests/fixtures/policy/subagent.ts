@@ -4,16 +4,18 @@ import type { ChainRow, Lists, Row } from "./builders";
 import {
   ALLOW,
   ASK,
+  CHECK,
   CLAUDE_DENY,
   CLAUDE_DENY_DECISION,
   DOWNGRADE,
+  GIT_PUSH,
+  MALFORMED_INPUTS,
   METACHARACTER_SKIP,
   NO_MATCH,
   PROTECTED_DECISION,
   bash,
   call,
   denyGuard,
-  exact,
   input,
   prefix,
   protectedAsk,
@@ -38,16 +40,6 @@ const agentRow = (
   input: input(c, [set("baseline", lists)], claude, guards),
   expected,
 });
-
-const CHECK = exact("npm run check");
-const GIT_PUSH = prefix("git push ");
-
-const MALFORMED_INPUTS: [string, unknown][] = [
-  ["{}", {}],
-  ["{ command: 42 }", { command: 42 }],
-  ["null", null],
-  ['"ls"', "ls"],
-];
 
 export const SUBAGENT_TABLE: Row[] = [
   agentRow(
