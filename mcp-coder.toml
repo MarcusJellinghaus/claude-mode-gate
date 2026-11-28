@@ -1,8 +1,11 @@
 # mcp-coder workflow config for this npm repo (mcp-coder docs: configuration/toolkits.md, setup.md).
 
 # types:lay needs Claude Code on the PATH; without the engine types typecheck cannot pass.
+# --no-audit: the real check is `npm run audit` (high severity, also in CI); npm's own
+# install summary lists low and moderate findings and only adds noise.
+# --no-fund: hides npm's "looking for funding" notice, also noise.
 [tool.mcp-coder.setup]
-steps = [ { name = "deps", argv = ["npm", "ci"] },
+steps = [ { name = "deps", argv = ["npm", "ci", "--no-audit", "--no-fund"] },
           { name = "types", argv = ["npm", "run", "types:lay"] } ]
 
 [tool.mcp-coder.toolkit]
