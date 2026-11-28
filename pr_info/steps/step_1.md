@@ -72,7 +72,8 @@ pluginSource(market):
   source = plugins[0].source; return non-empty string ? source : undefined
 findSourceProblems(market, exists):
   source = pluginSource(market); if undefined → ["...must list exactly one plugin with a source folder"]
-  exists(join(source, ".claude-plugin/plugin.json")) ? [] : ["...source <source> holds no .claude-plugin/plugin.json"]
+  exists(posix.join(source, ".claude-plugin/plugin.json")) ? [] : ["...source <source> holds no .claude-plugin/plugin.json"]
+  // posix.join (from node:path): "/" separators on Windows too, as the test expects
 main: market = load(root marketplace); stop on source problems; dir = pluginSource(market)
   plugin = load(dir/.claude-plugin/plugin.json); hooks = load(dir/hooks/hooks.json); moduleExists = entry → existsSync(resolve(dir, "hooks", entry))
 ```

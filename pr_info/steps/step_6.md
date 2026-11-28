@@ -5,6 +5,7 @@ One commit. A red CI run on a Claude Code bump is then clearly Claude Code's, an
 ## Key check
 
 - Confirm with `WebFetch` on GitHub's Dependabot options reference (docs.github.com, "Dependabot options reference") that `cooldown` with `default-days` is supported for the `npm` ecosystem, and that `exclude-patterns` is a `groups` key.
+- If `WebFetch` is denied or the docs cannot be fetched: commit `exclude-patterns` and `cooldown` as written below, and say in a `github_issue_comment` on issue #12 that the keys were not checked against the docs, so GitHub's validation of the file on push is the check.
 - If `cooldown` is not supported for npm (as the issue decides): leave the `cooldown` key out, still make and commit the `exclude-patterns` change, drop the cooldown half of the CHANGELOG line, and report the gap to the owner with `github_issue_comment` on issue #12 (one sentence: `cooldown` is unsupported for npm Dependabot updates, so it was left out).
 
 ## WHERE

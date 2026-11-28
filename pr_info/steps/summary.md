@@ -33,7 +33,7 @@ A load failure of the hooks module leaves every call ungated (`docs/design.md`, 
 
 6. **`check:manifests` follows the marketplace source.** The marketplace lists exactly one plugin; its `source` must hold `.claude-plugin/plugin.json`, and `plugin.json` and `hooks/hooks.json` are read from there (no fixed `plugin/...` paths).
 
-7. **Config paths stay live.** A repo-structure test fails when a Stryker `mutate` entry, a vitest `coverage.include` entry or a dependency-cruiser rule path points at no tracked file, and when `plugin/` holds a dev file (`CLAUDE.md`, `.mcp.json`).
+7. **Config paths stay live.** A repo-structure test fails when a Stryker `mutate` entry, a vitest `coverage.include` entry or a dependency-cruiser rule path points at no file in the repo (gitignored files do not count), and when `plugin/` holds a dev file (`CLAUDE.md`, `.mcp.json`).
 
 8. **Dependabot** gives Claude Code its own PR (`exclude-patterns`) and holds every npm update for 5 days (`cooldown`; left out and reported to the owner if unsupported for npm).
 
@@ -44,7 +44,7 @@ A load failure of the hooks module leaves every call ungated (`docs/design.md`, 
 - Every path-carrying config is edited once, in step 1. The kit smoke test lands there too, so `plugin/tests` holds a file the first time a config names it.
 - `lay-types.mjs` has one check (laid version equals pin); a missing file is just "no version".
 - `check:manifests` requires exactly one marketplace plugin, so there is no lookup by name.
-- The config-paths test lists tracked files with `git ls-files`, not a file walker or `fs.globSync`.
+- The config-paths test lists repo files with `git ls-files --cached --others --exclude-standard` (committed and new files, never gitignored ones), not a file walker or `fs.globSync`.
 - No extension of the dependency-cruiser rule to `plugin/tests` (optional in the issue, no present need).
 - The launchers read the pin with `node -p`, so batch and sh parse no JSON.
 - CI keeps its `types` matrix flag; only the install line changes.
