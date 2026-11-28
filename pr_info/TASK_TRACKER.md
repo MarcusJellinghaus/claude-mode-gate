@@ -49,9 +49,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 5: `mode-gate.schema.json` and the key-set test ([step_5.md](./steps/step_5.md))
 
-- [ ] Implementation: `tests/config-schema.test.ts`, `mode-gate.schema.json`, export the key sets
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `tests/config-schema.test.ts`, `mode-gate.schema.json`, export the key sets
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 6: per-rule findings (over-broad allow, unknown tool names) ([step_6.md](./steps/step_6.md))
 

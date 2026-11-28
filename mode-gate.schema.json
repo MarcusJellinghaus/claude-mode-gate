@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "claude-mode-gate configuration",
+  "description": "Editor validation for mode-gate.json. The validator in claude-mode-gate is the authority; this schema does not encode the rule grammar.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "description": "URL or path of this schema, for editors.",
+      "type": "string"
+    },
+    "logDir": {
+      "description": "Folder for the decision log: an absolute path or a path relative to the working folder.",
+      "type": "string",
+      "minLength": 1
+    },
+    "baseline": {
+      "description": "Rules that apply in every session, with or without an active profile.",
+      "$ref": "#/$defs/baseline"
+    },
+    "profiles": {
+      "description": "Switchable permission profiles, keyed by name.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]*$",
+        "not": { "enum": ["all", "baseline", "constructor", "prototype"] }
+      },
+      "additionalProperties": { "$ref": "#/$defs/profile" }
+    }
+  },
+  "$defs": {
+    "ruleList": {
+      "description": "Permission rules, such as \"Read\" or \"Bash(npm run test:*)\".",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "baseline": {
+      "description": "The baseline rule set.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": { "description": "Calls allowed without a prompt.", "$ref": "#/$defs/ruleList" },
+        "ask": { "description": "Calls that always prompt.", "$ref": "#/$defs/ruleList" },
+        "deny": { "description": "Calls that are always denied.", "$ref": "#/$defs/ruleList" }
+      }
+    },
+    "profile": {
+      "description": "A permission profile.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description"],
+      "properties": {
+        "description": {
+          "description": "What the profile is for, shown when listing profiles.",
+          "type": "string",
+          "minLength": 1
+        },
+        "delegable": {
+          "description": "Whether the profile can be handed to a subagent.",
+          "type": "boolean",
+          "default": true
+        },
+        "allow": { "description": "Calls allowed without a prompt.", "$ref": "#/$defs/ruleList" },
+        "ask": { "description": "Calls that always prompt.", "$ref": "#/$defs/ruleList" },
+        "deny": { "description": "Calls that are always denied.", "$ref": "#/$defs/ruleList" }
+      }
+    }
+  }
+}

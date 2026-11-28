@@ -83,9 +83,9 @@ interface CheckedFile {
   profiles: Record<string, Profile>;
 }
 
-const TOP_LEVEL_KEYS = ["$schema", "logDir", "baseline", "profiles"] as const;
-const BASELINE_KEYS = ["allow", "ask", "deny"] as const;
-const PROFILE_KEYS = ["description", "delegable", "allow", "ask", "deny"] as const;
+export const TOP_LEVEL_KEYS = ["$schema", "logDir", "baseline", "profiles"] as const;
+export const BASELINE_KEYS = ["allow", "ask", "deny"] as const;
+export const PROFILE_KEYS = ["description", "delegable", "allow", "ask", "deny"] as const;
 
 const PROFILE_NAME = /^[a-z][a-z0-9-]*$/;
 // `all` is the /gate-off keyword, `baseline` its own top-level key, the rest guard the prototype chain.
