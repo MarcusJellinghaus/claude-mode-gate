@@ -9,4 +9,5 @@ read-only   /.claude/settings.local.json
 read-write  /.scratch/
 # Gitignored, but needed for reading: the engine's types and dependency sources
 read-only   /.claude-plugin/types/
+read-only   /plugin/.claude-plugin/types/
 read-only   /node_modules/
