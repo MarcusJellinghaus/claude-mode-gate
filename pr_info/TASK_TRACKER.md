@@ -31,9 +31,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: Guard results in the walks — [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Protected Claude Code asks — [step_3.md](./steps/step_3.md)
 

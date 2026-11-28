@@ -132,12 +132,19 @@ function rulesOf(set: RuleSet, cls: Verdict): Rule[] {
   }
 }
 
+// Guard results come first in their class walk; a deny guard is the issue's step 2.
 function walk(
   cls: Verdict,
   input: DecideInput,
   name: string | undefined,
   chain: ChainEntry[] | undefined,
 ): Decision | undefined {
+  for (const guard of input.guards) {
+    if (guard.kind === cls) {
+      chain?.push({ step: cls === "deny" ? 2 : 3, cls, text: guard.message });
+      return { verdict: cls, source: "guard", message: guard.message };
+    }
+  }
   for (const set of input.sets) {
     for (const rule of rulesOf(set, cls)) {
       if (wholeMatches(rule, name, cls)) {

@@ -272,6 +272,107 @@ const UNUSABLE_NAME_ROWS: Row[] = [
   },
 ];
 
+const denyGuard = (message: string): GuardResult => ({ kind: "deny", message });
+const askGuard = (message: string): GuardResult => ({ kind: "ask", message });
+const guardDecision = (verdict: Decision["verdict"], message: string): Decision => ({
+  verdict,
+  source: "guard",
+  message,
+});
+const CLAUDE_DENY: ClaudeVerdict = { decision: "deny", reason: "blocked by settings" };
+const CLAUDE_DENY_DECISION: Decision = {
+  verdict: "deny",
+  source: "claude-code",
+  message: "blocked by settings",
+};
+const ALLOW_READ = set("baseline", { allow: [whole("Read")] });
+
+const GUARD_ROWS: Row[] = [
+  {
+    name: "a deny guard result beats a profile allow",
+    input: input(call("Read"), [ALLOW_READ], ALLOW, [denyGuard("protected path")]),
+    expected: guardDecision("deny", "protected path"),
+  },
+  {
+    name: "an arbitrary deny guard message is passed through unchanged",
+    input: input(call("Read"), [ALLOW_READ], ALLOW, [denyGuard("invalid subagent assignment")]),
+    expected: guardDecision("deny", "invalid subagent assignment"),
+  },
+  {
+    name: "an ask guard result asks despite a profile allow",
+    input: input(call("Read"), [ALLOW_READ], ALLOW, [askGuard("check this path")]),
+    expected: guardDecision("ask", "check this path"),
+  },
+  {
+    name: "a profile deny * beats an ask guard result",
+    input: input(call("Read"), [set("baseline", { deny: [whole("*")] })], ALLOW, [
+      askGuard("check this path"),
+    ]),
+    expected: ruleDecision("deny", "*"),
+  },
+  {
+    name: "a deny mcp__srv rule beats an ask guard result on mcp__srv__a",
+    input: input(call("mcp__srv__a"), [set("baseline", { deny: [whole("mcp__srv")] })], ALLOW, [
+      askGuard("check this path"),
+    ]),
+    expected: ruleDecision("deny", "mcp__srv"),
+  },
+  {
+    name: "a deny guard result is reported before a matching deny rule",
+    input: input(call("Read"), [set("baseline", { deny: [whole("Read")] })], ALLOW, [
+      denyGuard("protected path"),
+    ]),
+    expected: guardDecision("deny", "protected path"),
+  },
+  {
+    name: "an ask guard result is reported before a matching ask rule",
+    input: input(call("Read"), [set("baseline", { ask: [whole("Read")] })], ALLOW, [
+      askGuard("check this path"),
+    ]),
+    expected: guardDecision("ask", "check this path"),
+  },
+  {
+    name: "a deny rule beats an ask guard result",
+    input: input(call("Read"), [set("baseline", { deny: [whole("Read")] })], ALLOW, [
+      askGuard("check this path"),
+    ]),
+    expected: ruleDecision("deny", "Read"),
+  },
+  {
+    name: "two deny guard results report the first",
+    input: input(call("Read"), [ALLOW_READ], ALLOW, [
+      denyGuard("protected path"),
+      denyGuard("invalid subagent assignment"),
+    ]),
+    expected: guardDecision("deny", "protected path"),
+  },
+  {
+    name: "a Claude Code deny stays a Claude Code deny with an ask guard result",
+    input: input(call("Read"), [ALLOW_READ], CLAUDE_DENY, [askGuard("check this path")]),
+    expected: CLAUDE_DENY_DECISION,
+  },
+  {
+    name: "a Claude Code deny stays a Claude Code deny with a deny guard result",
+    input: input(call("Read"), [ALLOW_READ], CLAUDE_DENY, [denyGuard("protected path")]),
+    expected: CLAUDE_DENY_DECISION,
+  },
+  {
+    name: "a deny guard result denies a call with no tool name",
+    input: input({ input: {} }, [set("baseline")], ALLOW, [denyGuard("protected path")]),
+    expected: guardDecision("deny", "protected path"),
+  },
+  {
+    name: "an ask guard result on a call with no tool name asks as malformed",
+    input: input({ input: {} }, [set("baseline")], ALLOW, [askGuard("check this path")]),
+    expected: MALFORMED,
+  },
+  {
+    name: "a deny guard result denies under an unknown Claude Code decision",
+    input: input(call("Read"), [ALLOW_READ], { decision: "maybe" }, [denyGuard("protected path")]),
+    expected: guardDecision("deny", "protected path"),
+  },
+];
+
 const ROWS: Row[] = [
   ...CORE_ROWS,
   ...WHOLE_TOOL_ROWS,
@@ -279,6 +380,7 @@ const ROWS: Row[] = [
   ...PASS_THROUGH_ROWS,
   ...UNKNOWN_DECISION_ROWS,
   ...UNUSABLE_NAME_ROWS,
+  ...GUARD_ROWS,
 ];
 
 const CHAIN_ROWS: ChainRow[] = [
@@ -315,6 +417,23 @@ const CHAIN_ROWS: ChainRow[] = [
   {
     name: "a missing tool name under a matching allow",
     input: input({ input: {} }, [set("baseline", { allow: [whole("*")] })]),
+    chain: [],
+  },
+  {
+    name: "a deny guard result before a matching deny rule",
+    input: input(call("Read"), [set("baseline", { deny: [whole("Read")] })], ALLOW, [
+      denyGuard("protected path"),
+    ]),
+    chain: [{ step: 2, cls: "deny", text: "protected path" }],
+  },
+  {
+    name: "an ask guard result",
+    input: input(call("Read"), [ALLOW_READ], ALLOW, [askGuard("check this path")]),
+    chain: [{ step: 3, cls: "ask", text: "check this path" }],
+  },
+  {
+    name: "an ask guard result on a call with no tool name",
+    input: input({ input: {} }, [set("baseline")], ALLOW, [askGuard("check this path")]),
     chain: [],
   },
 ];
