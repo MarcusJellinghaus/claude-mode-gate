@@ -31,9 +31,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: `parseRule` and the per-file coverage gate ([step_2.md](./steps/step_2.md))
 
-- [ ] Implementation: `tests/config-rule.test.ts`, `parseRule` in `hooks/config.ts`, `vitest.config.ts` and `stryker.config.json`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `tests/config-rule.test.ts`, `parseRule` in `hooks/config.ts`, `vitest.config.ts` and `stryker.config.json`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: the shipped data files ([step_3.md](./steps/step_3.md))
 

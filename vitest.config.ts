@@ -5,10 +5,10 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     coverage: {
       provider: "v8",
-      include: ["hooks/policy.ts"],
+      include: ["hooks/policy.ts", "hooks/config.ts"],
       reporter: ["text", "lcov"],
-      // The pure policy is the security boundary: hold it to a high bar once it has logic.
-      thresholds: { lines: 95, functions: 95, branches: 95, statements: 95 },
+      // The policy and the config parser are the security boundary: each file must reach the bar on its own.
+      thresholds: { lines: 95, functions: 95, branches: 95, statements: 95, perFile: true },
     },
   },
 });
