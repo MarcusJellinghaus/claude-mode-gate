@@ -22,3 +22,29 @@ applied
 applied
 applied
 applied
+
+## Round 2 — 2026-11-28
+
+**Findings**:
+
+tests/config-rule.test.ts:68 — medium — The acceptance row for JavaScript `\s` edge whitespace is missing: no test checks that `Bash(git push *)` with a non-breaking space (U+00A0) at the start of the argument is a rule error. The code handles it through `LEADING_SPACE` at `hooks/config.ts:52`, but nothing protects that behaviour.
+tests/config-fail.test.ts:40 — medium — The "invalid user file" fail-closed row uses `INVALID_USER`, which has no `baseline`. Issue #4 asks for a user file that has a valid `baseline` and is invalid elsewhere, and requires the result's `baseline` to be empty rather than the user's. No test covers that case.
+hooks/config.ts:693 — low — The failed result always sets `logDir` to `logs` under `cwd`. Issue #4 asks for `logDir` "as in the success result", so when the user file is valid (for example an absolute `logDir`) but a built-in or the default baseline has an error, the user's resolved `logDir` is dropped and the log lands in the repo.
+hooks/config.ts:23 — low — `isMcpSegment` rejects MCP tool names that have `__` or an `_` at the start or end of the tool segment, such as `mcp__s__t__u`. Issue #4 says tool and server names use letters, digits, `_` and `-`, so a deny rule for such a real tool becomes a config error. The grammar here is stricter than the issue specifies.
+
+**Decisions**:
+
+tasks
+
+- Add an acceptance row to tests/config-rule.test.ts (near line 68) asserting that `Bash(git push *)` with a non-breaking space (U+00A0) at the start of the argument is reported as a rule error, so the LEADING_SPACE handling at hooks/config.ts:52 is covered.
+- Add a fail-closed row to tests/config-fail.test.ts (near line 40) with a user file that has a valid `baseline` but is invalid elsewhere, and assert that the failed result's `baseline` is empty, not the user's baseline. Write the test first and fix hooks/config.ts if it fails.
+- In hooks/config.ts (around line 693), when the user file itself is valid but a built-in profile or the default baseline has an error, set the failed result's `logDir` to the user's resolved `logDir`, as in the success result, instead of always using `logs` under `cwd`. Write a failing test first, for example a valid user file with an absolute `logDir` plus a broken built-in or default baseline.
+- In hooks/config.ts (isMcpSegment, around line 23), relax the MCP name check so that tool segments made of letters, digits, `_` and `-` are accepted, including `__` inside the tool segment and `_` at its start or end (for example `mcp__s__t__u`), as issue #4 specifies. Write a failing test in the rule tests first.
+
+**Changes**:
+
+applied
+applied
+applied
+applied
+applied
