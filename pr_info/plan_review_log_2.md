@@ -22,3 +22,23 @@ applied
 applied
 applied
 applied
+
+## Round 2 — 2026-11-28
+
+**Findings**:
+
+pr_info/steps/step_2.md:53 — low — `runClaude` returns `status ?? 1` and never prints `result.error`. If the spawn fails (for example ENOENT or EACCES when the `bin` target is missing on Linux CI, which the Windows-only precondition at step_2.md:11 cannot catch), `plugin:validate`, `plugin:test` and `types:lay` exit 1 with no output, and `check.mjs` shows only "(no output)". Fix: when `result.error` is set, write its message to stderr before returning 1, and add one table row for that path in `tests/claude.test.ts` if it becomes a pure helper.
+pr_info/steps/step_5.md:57 — low — Every verify step runs on Windows only. No step pushes and reads the Linux CI result with `check_branch_status`, although the issue says "Linux is checked through CI" and to stop and ask if `plugin:validate` or `plugin:test` behaves differently there. Step 8 hands that comparison to the owner (step_8.md:12). Fix: after pushing steps 4 and 5, check the push-checks jobs `typecheck`, `plugin:validate` and `plugin:test` with `check_branch_status`. If one fails on Linux only, write `.blocked.txt` and post the stop-and-ask comment on #12.
+
+**Decisions**:
+
+tasks
+
+- In pr_info/steps/step_2.md:53, have `runClaude` write `result.error.message` to stderr when `result.error` is set, then return 1, so a failed spawn (ENOENT or EACCES) in `plugin:validate`, `plugin:test` or `types:lay` shows the cause instead of '(no output)'. If that logic is a pure helper, add a table row for the spawn-error path in `tests/claude.test.ts`.
+- In pr_info/steps/step_5.md:57, add a verify step after pushing steps 4 and 5: read the Linux CI push-checks jobs `typecheck`, `plugin:validate` and `plugin:test` with `check_branch_status`. If any of them fails on Linux but passes on Windows, write `.blocked.txt` and post the stop-and-ask comment on #12, as the issue requires. Update step_8.md:12 to match.
+
+**Changes**:
+
+applied
+applied
+applied
