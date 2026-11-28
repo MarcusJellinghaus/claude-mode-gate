@@ -34,3 +34,25 @@ applied
 applied
 applied
 applied
+
+## Round 2 — 2026-11-28
+
+**Findings**:
+
+I found two low-severity gaps and nothing above low. Both are untested branches in `hooks/policy.ts`, which would let Stryker mutants survive. The fix for each is one test row; `policy.ts` itself needs no change.
+
+hooks/policy.ts:301 — low — No test reaches the `name === undefined` guard in `wholeMatches` through an `mcp__` rule. A call with no tool name only meets `*` and `Bash` deny rules (`core.ts:225-232`). If the guard were deleted, a malformed call under `deny mcp__srv` would throw a TypeError instead of returning `ask`/`malformed`, and no test would fail. Fix: add one row, a call with no tool name under `deny mcp__srv`, expecting `MALFORMED`.
+hooks/policy.ts:303 — low — No test covers the `startsWith("mcp__")` check for plain tool names. `allowCase("Skill", "SkillX", false)` never builds the `Skill__…` name the server prefix would match, so removing the check passes every test while `allow Skill` would then allow `Skill__x`. Fix: add `allowCase("Skill", "Skill__x", false)` and `denyCase("Edit", "Edit__x", false)` next to `core.ts:93`.
+
+**Decisions**:
+
+tasks
+
+- Add a test row for a call with no tool name under a `deny mcp__srv` rule, expecting `MALFORMED`. This covers the `name === undefined` guard in `wholeMatches` (hooks/policy.ts:301). Put it next to the existing no-name rows at tests/fixtures/policy/core.ts:225-232.
+- Add negative rows `allowCase("Skill", "Skill__x", false)` and `denyCase("Edit", "Edit__x", false)` next to tests/fixtures/policy/core.ts:93. They cover the `startsWith("mcp__")` check for plain tool names in hooks/policy.ts:303, so the server-prefix match cannot apply to non-mcp tool names.
+
+**Changes**:
+
+applied
+applied
+applied
