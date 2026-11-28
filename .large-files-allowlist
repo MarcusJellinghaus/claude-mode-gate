@@ -1,0 +1,3 @@
+# Files allowed over the 600-line limit.
+# hooks/config.ts cannot be split: the architecture rules fix its imports.
+hooks/config.ts

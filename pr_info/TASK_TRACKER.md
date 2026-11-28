@@ -79,9 +79,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 10: `loadConfig`, success path, baseline selection and merge ([step_10.md](./steps/step_10.md))
 
-- [ ] Implementation: `tests/config-fixtures.ts`, `tests/config.test.ts`, `loadConfig`, `readJson` and `buildResult` in `hooks/config.ts`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `tests/config-fixtures.ts`, `tests/config.test.ts`, `loadConfig`, `readJson` and `buildResult` in `hooks/config.ts`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 11: `loadConfig`, fail-closed result, `logDir`, start profiles, untrusted env ([step_11.md](./steps/step_11.md))
 

@@ -1,3 +1,5 @@
+import { baseline as defaultBaseline } from "./baseline";
+import { builtinProfiles } from "./builtin-profiles";
 import { decide } from "./policy";
 import type { Profile, Rule, RuleSet } from "./policy";
 
@@ -571,4 +573,137 @@ export function parseStartProfiles(env: ModeGateEnv): { names: string[]; warning
     });
   }
   return { names, warnings };
+}
+
+interface RawRuleLists {
+  allow?: string[];
+  ask?: string[];
+  deny?: string[];
+}
+interface RawProfile extends RawRuleLists {
+  description: string;
+  delegable?: boolean;
+}
+
+export interface LoadDeps {
+  // undefined means the file is missing; a rejection means it could not be read.
+  readFile: (path: string) => Promise<string | undefined>;
+  env: ModeGateEnv;
+  untrustedEnv: readonly EnvName[];
+  cwd: string;
+  baseline?: RawRuleLists;
+  builtins?: Record<string, RawProfile>;
+}
+
+// Plain JSON throughout: the result is stored in `$.state`.
+type LoadResult =
+  | {
+      ok: true;
+      config: {
+        baseline: RuleSet;
+        profiles: Record<string, Profile>;
+        proposals: Record<string, Profile>;
+      };
+      configPath?: string;
+      logDir: string;
+      startProfiles: string[];
+      warnings: Issue[];
+    }
+  | {
+      ok: false;
+      errors: Issue[];
+      baseline: RuleSet;
+      configPath?: string;
+      logDir: string;
+      startProfiles: [];
+      warnings: Issue[];
+    };
+
+interface ResultParts {
+  issues: Issue[];
+  baseline: RuleSet | undefined;
+  profiles: Record<string, Profile>;
+  configPath: string | undefined;
+  logDir: string;
+}
+
+const BOM = String.fromCodePoint(0xfeff);
+
+async function readJson(
+  readFile: LoadDeps["readFile"],
+  path: string,
+  source: Source,
+): Promise<{ value?: unknown; issues: Issue[] }> {
+  const fail = (message: string) => ({
+    issues: [{ severity: "error" as const, source, path: "", message }],
+  });
+  let text: string | undefined;
+  try {
+    text = await readFile(path);
+  } catch {
+    return fail(`cannot read ${path}`);
+  }
+  if (text === undefined) return { issues: [] };
+  try {
+    const value: unknown = JSON.parse(text.startsWith(BOM) ? text.slice(BOM.length) : text);
+    return { value, issues: [] };
+  } catch {
+    return fail(`${path} is not valid JSON`);
+  }
+}
+
+// The one place that shapes a result, so every failure gets the same fail-closed form.
+function buildResult(parts: ResultParts): LoadResult {
+  const { issues, baseline, profiles, configPath, logDir } = parts;
+  const errors = issues.filter((i) => i.severity === "error");
+  const warnings = issues.filter((i) => i.severity === "warning");
+  const where = { ...(configPath === undefined ? {} : { configPath }), logDir };
+  if (errors.length === 0 && baseline) {
+    return {
+      ok: true,
+      config: { baseline, profiles, proposals: {} },
+      ...where,
+      startProfiles: [],
+      warnings,
+    };
+  }
+  return {
+    ok: false,
+    errors,
+    baseline: { name: "baseline", allow: [], ask: [], deny: [] },
+    ...where,
+    startProfiles: [],
+    warnings,
+  };
+}
+
+export async function loadConfig(deps: LoadDeps): Promise<LoadResult> {
+  const { readFile, env, cwd, baseline = defaultBaseline, builtins = builtinProfiles } = deps;
+  const defaults = checkFile({ baseline }, "baseline");
+  const shipped = checkFile({ profiles: builtins }, "builtin");
+  const issues = [...defaults.issues, ...shipped.issues];
+  const resolved = resolveConfigPath(env);
+  const configPath = "path" in resolved ? resolved.path : undefined;
+  if ("issue" in resolved) issues.push(resolved.issue);
+  let selected = defaults.baseline;
+  let userProfiles: Record<string, Profile> = {};
+  if (configPath !== undefined) {
+    const read = await readJson(readFile, configPath, "user");
+    issues.push(...read.issues);
+    if (read.value !== undefined) {
+      const user = checkFile(read.value, "user");
+      issues.push(...user.issues);
+      // A user baseline replaces the default whole, also when it is invalid: then the load fails.
+      if (isPlainObject(read.value) && Object.hasOwn(read.value, "baseline"))
+        selected = user.baseline;
+      userProfiles = user.profiles;
+    }
+  }
+  return buildResult({
+    issues,
+    baseline: selected,
+    profiles: { ...shipped.profiles, ...userProfiles },
+    configPath,
+    logDir: joinPath(cwd, "logs"),
+  });
 }
