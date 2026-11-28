@@ -545,3 +545,30 @@ export function resolveConfigPath(env: ModeGateEnv): { path: string } | { issue:
     },
   };
 }
+
+// Takes the env filtered by trustedEnv, so a repo-set MODE_GATE_PROFILES arrives as unset.
+export function parseStartProfiles(env: ModeGateEnv): { names: string[]; warnings: Issue[] } {
+  const value = env.MODE_GATE_PROFILES;
+  if (value === undefined) return { names: [], warnings: [] };
+  const entries = new Set(
+    value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== ""),
+  );
+  const names: string[] = [];
+  const warnings: Issue[] = [];
+  for (const entry of entries) {
+    if (isValidProfileName(entry)) {
+      names.push(entry);
+      continue;
+    }
+    warnings.push({
+      severity: "warning",
+      source: "env",
+      path: "env.MODE_GATE_PROFILES",
+      message: `invalid profile name \`${entry}\``,
+    });
+  }
+  return { names, warnings };
+}

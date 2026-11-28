@@ -73,9 +73,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 9: `parseStartProfiles` ([step_9.md](./steps/step_9.md))
 
-- [ ] Implementation: `tests/config-start-profiles.test.ts`, `parseStartProfiles` in `hooks/config.ts`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `tests/config-start-profiles.test.ts`, `parseStartProfiles` in `hooks/config.ts`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 10: `loadConfig`, success path, baseline selection and merge ([step_10.md](./steps/step_10.md))
 
