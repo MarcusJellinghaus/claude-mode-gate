@@ -25,3 +25,23 @@ applied
 applied
 applied
 applied
+
+## Round 2 — 2026-11-28
+
+**Findings**:
+
+pr_info/steps/step_4.md:34 — medium — `npm run check` runs `test:coverage` with a 95% branch threshold on `hooks/policy.ts` at every step (`scripts/check.mjs`, `vitest.config.ts`), but step 4 adds code that no step-4 row exercises. Nothing tests `commandOf`'s null, non-object, missing-key or non-string branches, or the `command === undefined` path of `matches`/`allowMatch`, until step 5. No row tests an exact or prefix deny/ask rule against a non-Bash tool either. So the step-4 commit may fail the gate. The same gap also leaves a Bash call with no `command` under `allow Bash` or `allow *` returning `allow` after step 4. Fix: move the malformed-`command` flag and its rows from step 5 into step 4, and add a non-Bash row for an exact deny rule.
+pr_info/steps/step_5.md:5 — low — Step 5 adds the largest tables but only says to commit "any `tests/fixtures/policy/*.ts`". Unlike step 4, it never says to move the tables into fixtures if `tests/policy.test.ts` now passes 750 lines, which the issue requires (Constraints, Tests).
+
+**Decisions**:
+
+tasks
+
+- In pr_info/steps/step_4.md (around line 34), move the malformed-`command` handling and its test rows from step 5 into step 4. That covers `commandOf` with a null, non-object, missing-key or non-string `command`, and the `command === undefined` path of `matches`/`allowMatch`. Make sure a Bash call with no `command` under `allow Bash` or `allow *` does not return `allow` after step 4. Also add a step-4 row that tests an exact deny rule against a non-Bash tool, so the 95% coverage gate passes at the step-4 commit. Remove the moved items from pr_info/steps/step_5.md.
+- In pr_info/steps/step_5.md (around line 5), add an instruction like step 4's: if `tests/policy.test.ts` goes over 750 lines, move the tables into `tests/fixtures/policy/*.ts`, as the issue's constraints require.
+
+**Changes**:
+
+applied
+applied
+applied
