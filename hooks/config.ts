@@ -623,6 +623,7 @@ interface ResultParts {
   issues: Issue[];
   baseline: RuleSet | undefined;
   profiles: Record<string, Profile>;
+  proposals: Record<string, Profile>;
   configPath: string | undefined;
   userLogDir: string | undefined;
   cwd: string;
@@ -666,7 +667,7 @@ const resolveLogDir = (cwd: string, logDir: string): string =>
 
 // The one place that shapes a result, so every failure gets the same fail-closed form.
 function buildResult(parts: ResultParts): LoadResult {
-  const { issues, baseline, profiles, configPath, userLogDir, cwd, startNames } = parts;
+  const { issues, baseline, profiles, proposals, configPath, userLogDir, cwd, startNames } = parts;
   const errors = issues.filter((i) => i.severity === "error");
   const warnings = issues.filter((i) => i.severity === "warning");
   const path = configPath === undefined ? {} : { configPath };
@@ -675,7 +676,7 @@ function buildResult(parts: ResultParts): LoadResult {
     const unknown = startNames.filter((name) => !Object.hasOwn(profiles, name));
     return {
       ok: true,
-      config: { baseline, profiles, proposals: {} },
+      config: { baseline, profiles, proposals },
       ...path,
       logDir: resolveLogDir(cwd, userLogDir ?? "logs"),
       startProfiles,
@@ -690,6 +691,41 @@ function buildResult(parts: ResultParts): LoadResult {
     logDir: joinPath(cwd, "logs"),
     startProfiles: [],
     warnings,
+  };
+}
+
+const PROJECT_FILE = ".mode-gate.json";
+// Settings a cloned repo must not change: where the log goes and what the baseline allows.
+const PROJECT_IGNORED_KEYS: readonly string[] = ["logDir", "baseline"];
+
+const toWarning = (i: Issue): Issue => ({ ...i, severity: "warning" });
+
+const ignoredKey = (key: string): Issue => ({
+  severity: "warning",
+  source: "project",
+  path: key,
+  message: "ignored in a project file",
+});
+
+function stripIgnoredKeys(value: unknown): { input: unknown; ignored: Issue[] } {
+  if (!isPlainObject(value)) return { input: value, ignored: [] };
+  const ignored = PROJECT_IGNORED_KEYS.filter((key) => Object.hasOwn(value, key)).map(ignoredKey);
+  const kept = Object.entries(value).filter(([key]) => !PROJECT_IGNORED_KEYS.includes(key));
+  return { input: Object.fromEntries(kept), ignored };
+}
+
+// A project file only proposes profiles, so none of its issues can fail the load.
+async function loadProposals(
+  readFile: LoadDeps["readFile"],
+  cwd: string,
+): Promise<{ proposals: Record<string, Profile>; warnings: Issue[] }> {
+  const read = await readJson(readFile, joinPath(cwd, PROJECT_FILE), "project");
+  if (read.value === undefined) return { proposals: {}, warnings: read.issues.map(toWarning) };
+  const { input, ignored } = stripIgnoredKeys(read.value);
+  const checked = checkFile(input, "project");
+  return {
+    proposals: checked.profiles,
+    warnings: [...ignored, ...read.issues, ...checked.issues].map(toWarning),
   };
 }
 
@@ -718,12 +754,15 @@ export async function loadConfig(deps: LoadDeps): Promise<LoadResult> {
       userLogDir = user.logDir;
     }
   }
+  const project = await loadProposals(readFile, cwd);
+  issues.push(...project.warnings);
   const start = parseStartProfiles(env);
   issues.push(...start.warnings);
   return buildResult({
     issues,
     baseline: selected,
     profiles: { ...shipped.profiles, ...userProfiles },
+    proposals: project.proposals,
     configPath,
     userLogDir,
     cwd,

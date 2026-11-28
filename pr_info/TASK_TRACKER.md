@@ -91,9 +91,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 12: project proposals from `.mode-gate.json` ([step_12.md](./steps/step_12.md))
 
-- [ ] Implementation: `tests/config-proposals.test.ts`, `loadProposals` in `hooks/config.ts`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `tests/config-proposals.test.ts`, `loadProposals` in `hooks/config.ts`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 13: cross-layer duplicate findings ([step_13.md](./steps/step_13.md))
 
