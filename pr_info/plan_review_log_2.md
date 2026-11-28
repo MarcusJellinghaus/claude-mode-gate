@@ -42,3 +42,17 @@ tasks
 applied
 applied
 applied
+
+## Round 3 — 2026-11-28
+
+**Findings**:
+
+`pr_info/steps/step_2.md:11` — medium — The precondition stops step 2 whenever the package has a `preinstall`, `install` or `postinstall` script. The issue stops only if the package *needs* that script to work under `ignore-scripts=true`. The owner's `claude --version` check after the install proves whether the binary works without it. As written, a harmless script would block the pin and every later step. Fix: block only when the `bin` target is missing or is a placeholder, or when the owner's `--version` check failed.
+
+**Decisions**:
+
+dismiss
+
+**Changes**:
+
+dismiss
