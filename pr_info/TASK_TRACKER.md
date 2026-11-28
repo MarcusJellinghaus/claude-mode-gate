@@ -67,9 +67,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 8: path helpers, environment filter, config path ([step_8.md](./steps/step_8.md))
 
-- [ ] Implementation: `tests/config-paths.test.ts`, `isAbsolutePath`, `joinPath`, `trustedEnv`, `resolveConfigPath`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `tests/config-paths.test.ts`, `isAbsolutePath`, `joinPath`, `trustedEnv`, `resolveConfigPath`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 9: `parseStartProfiles` ([step_9.md](./steps/step_9.md))
 

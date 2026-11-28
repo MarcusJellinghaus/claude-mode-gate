@@ -455,3 +455,93 @@ function checkFile(input: unknown, source: Source): CheckedFile {
 export function validateConfig(input: unknown, source: Source): Issue[] {
   return checkFile(input, source).issues;
 }
+
+interface ModeGateEnv {
+  MODE_GATE_PROFILES?: string | undefined;
+  MODE_GATE_CONFIG?: string | undefined;
+  XDG_CONFIG_HOME?: string | undefined;
+  HOME?: string | undefined;
+  USERPROFILE?: string | undefined;
+}
+type EnvName = keyof ModeGateEnv;
+const ENV_NAMES: readonly EnvName[] = [
+  "MODE_GATE_PROFILES",
+  "MODE_GATE_CONFIG",
+  "XDG_CONFIG_HOME",
+  "HOME",
+  "USERPROFILE",
+];
+
+// POSIX root, drive letter with a separator, UNC share.
+const ABSOLUTE_PATHS = [/^\//, /^[A-Za-z]:[\\/]/, /^\\\\/];
+
+export function isAbsolutePath(p: string): boolean {
+  return ABSOLUTE_PATHS.some((pattern) => pattern.test(p));
+}
+
+// Pure string join in the base's style; ".." is kept, so callers see the path as written.
+export function joinPath(base: string, child: string): string {
+  if (base.endsWith("\\") || base.endsWith("/")) return base + child;
+  const sep = base.includes("\\") ? "\\" : "/";
+  return `${base}${sep}${child}`;
+}
+
+// Reads only the five names, so nothing else in the process environment reaches the config.
+export function trustedEnv(
+  env: ModeGateEnv,
+  untrusted: readonly EnvName[],
+): { env: ModeGateEnv; warnings: Issue[] } {
+  const trusted: ModeGateEnv = {};
+  const warnings: Issue[] = [];
+  for (const name of ENV_NAMES) {
+    if (untrusted.includes(name)) {
+      warnings.push({
+        severity: "warning",
+        source: "env",
+        path: `env.${name}`,
+        message: `${name} is set by the repo's settings and is ignored.`,
+      });
+      continue;
+    }
+    // eslint-disable-next-line security/detect-object-injection -- name is one of the fixed ENV_NAMES
+    const value = env[name];
+    // eslint-disable-next-line security/detect-object-injection -- name is one of the fixed ENV_NAMES
+    if (value !== undefined && value !== "") trusted[name] = value;
+  }
+  return { env: trusted, warnings };
+}
+
+const isAbsoluteDir = (dir: string | undefined): dir is string =>
+  dir !== undefined && isAbsolutePath(dir);
+const configIn = (dir: string): string => joinPath(joinPath(dir, "mode-gate"), "config.json");
+
+export function resolveConfigPath(env: ModeGateEnv): { path: string } | { issue: Issue } {
+  const {
+    MODE_GATE_CONFIG: explicit,
+    XDG_CONFIG_HOME: xdg,
+    HOME: home,
+    USERPROFILE: profile,
+  } = env;
+  if (explicit !== undefined && explicit !== "") {
+    if (isAbsolutePath(explicit)) return { path: explicit };
+    return {
+      issue: {
+        severity: "error",
+        source: "env",
+        path: "env.MODE_GATE_CONFIG",
+        message: "MODE_GATE_CONFIG must be an absolute path.",
+      },
+    };
+  }
+  if (isAbsoluteDir(xdg)) return { path: configIn(xdg) };
+  const homeDir = [home, profile].find(isAbsoluteDir);
+  if (homeDir !== undefined) return { path: configIn(joinPath(homeDir, ".config")) };
+  return {
+    issue: {
+      severity: "error",
+      source: "user",
+      path: "",
+      message: "no home folder: set HOME or USERPROFILE",
+    },
+  };
+}
