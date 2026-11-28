@@ -23,6 +23,43 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Types, `BASH_METACHARACTERS` and the `decide` core — [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation (tests + production code)
+- [ ] Quality checks — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Guard results in the walks — [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation (tests + production code)
+- [ ] Quality checks — fix all issues
+- [ ] Commit message prepared
+
+### Step 3: Protected Claude Code asks — [step_3.md](./steps/step_3.md)
+
+- [ ] Implementation (tests + production code)
+- [ ] Quality checks — fix all issues
+- [ ] Commit message prepared
+
+### Step 4: Bash matching, the Bash downgrade and Bash calls without a command — [step_4.md](./steps/step_4.md)
+
+- [ ] Implementation (tests + production code)
+- [ ] Quality checks — fix all issues
+- [ ] Commit message prepared
+
+### Step 5: Subagent Bash — [step_5.md](./steps/step_5.md)
+
+- [ ] Implementation (tests + production code)
+- [ ] Quality checks — fix all issues
+- [ ] Commit message prepared
+
+### Step 6: Boy Scout docs — [step_6.md](./steps/step_6.md)
+
+- [ ] Implementation (documentation edits in `.claude/CLAUDE.md` and `docs/design.md`)
+- [ ] Quality checks — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: review the full branch diff against `main` and address findings
+- [ ] PR summary prepared
