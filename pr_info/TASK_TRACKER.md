@@ -37,9 +37,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 3: the shipped data files ([step_3.md](./steps/step_3.md))
 
-- [ ] Implementation: `tests/config-data.test.ts`, `hooks/baseline.ts`, `hooks/builtin-profiles.ts`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `tests/config-data.test.ts`, `hooks/baseline.ts`, `hooks/builtin-profiles.ts`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: `validateConfig`, structure ([step_4.md](./steps/step_4.md))
 
