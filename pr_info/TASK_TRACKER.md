@@ -85,9 +85,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 11: `loadConfig`, fail-closed result, `logDir`, start profiles, untrusted env ([step_11.md](./steps/step_11.md))
 
-- [ ] Implementation: `tests/config-fail.test.ts`, extend `loadConfig`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `tests/config-fail.test.ts`, extend `loadConfig`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 12: project proposals from `.mode-gate.json` ([step_12.md](./steps/step_12.md))
 

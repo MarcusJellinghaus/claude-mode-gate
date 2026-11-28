@@ -624,7 +624,9 @@ interface ResultParts {
   baseline: RuleSet | undefined;
   profiles: Record<string, Profile>;
   configPath: string | undefined;
-  logDir: string;
+  userLogDir: string | undefined;
+  cwd: string;
+  startNames: string[];
 }
 
 const BOM = String.fromCodePoint(0xfeff);
@@ -652,41 +654,57 @@ async function readJson(
   }
 }
 
+const unknownProfile = (name: string): Issue => ({
+  severity: "warning",
+  source: "env",
+  path: "env.MODE_GATE_PROFILES",
+  message: `unknown profile \`${name}\``,
+});
+
+const resolveLogDir = (cwd: string, logDir: string): string =>
+  isAbsolutePath(logDir) ? logDir : joinPath(cwd, logDir);
+
 // The one place that shapes a result, so every failure gets the same fail-closed form.
 function buildResult(parts: ResultParts): LoadResult {
-  const { issues, baseline, profiles, configPath, logDir } = parts;
+  const { issues, baseline, profiles, configPath, userLogDir, cwd, startNames } = parts;
   const errors = issues.filter((i) => i.severity === "error");
   const warnings = issues.filter((i) => i.severity === "warning");
-  const where = { ...(configPath === undefined ? {} : { configPath }), logDir };
+  const path = configPath === undefined ? {} : { configPath };
   if (errors.length === 0 && baseline) {
+    const startProfiles = startNames.filter((name) => Object.hasOwn(profiles, name));
+    const unknown = startNames.filter((name) => !Object.hasOwn(profiles, name));
     return {
       ok: true,
       config: { baseline, profiles, proposals: {} },
-      ...where,
-      startProfiles: [],
-      warnings,
+      ...path,
+      logDir: resolveLogDir(cwd, userLogDir ?? "logs"),
+      startProfiles,
+      warnings: [...warnings, ...unknown.map(unknownProfile)],
     };
   }
   return {
     ok: false,
     errors,
     baseline: { name: "baseline", allow: [], ask: [], deny: [] },
-    ...where,
+    ...path,
+    logDir: joinPath(cwd, "logs"),
     startProfiles: [],
     warnings,
   };
 }
 
 export async function loadConfig(deps: LoadDeps): Promise<LoadResult> {
-  const { readFile, env, cwd, baseline = defaultBaseline, builtins = builtinProfiles } = deps;
+  const { readFile, cwd, baseline = defaultBaseline, builtins = builtinProfiles } = deps;
+  const { env, warnings } = trustedEnv(deps.env, deps.untrustedEnv);
   const defaults = checkFile({ baseline }, "baseline");
   const shipped = checkFile({ profiles: builtins }, "builtin");
-  const issues = [...defaults.issues, ...shipped.issues];
+  const issues = [...warnings, ...defaults.issues, ...shipped.issues];
   const resolved = resolveConfigPath(env);
   const configPath = "path" in resolved ? resolved.path : undefined;
   if ("issue" in resolved) issues.push(resolved.issue);
   let selected = defaults.baseline;
   let userProfiles: Record<string, Profile> = {};
+  let userLogDir: string | undefined;
   if (configPath !== undefined) {
     const read = await readJson(readFile, configPath, "user");
     issues.push(...read.issues);
@@ -697,13 +715,18 @@ export async function loadConfig(deps: LoadDeps): Promise<LoadResult> {
       if (isPlainObject(read.value) && Object.hasOwn(read.value, "baseline"))
         selected = user.baseline;
       userProfiles = user.profiles;
+      userLogDir = user.logDir;
     }
   }
+  const start = parseStartProfiles(env);
+  issues.push(...start.warnings);
   return buildResult({
     issues,
     baseline: selected,
     profiles: { ...shipped.profiles, ...userProfiles },
     configPath,
-    logDir: joinPath(cwd, "logs"),
+    userLogDir,
+    cwd,
+    startNames: start.names,
   });
 }
