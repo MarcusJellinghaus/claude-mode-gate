@@ -52,3 +52,18 @@ applied
 applied
 applied
 applied
+
+## Round 3 — 2026-11-28
+
+**Findings**:
+
+pr_info/steps/step_2.md:11 — medium — If the owner's Claude Code package needs an install script (or the pin or `bin` probe fails), step 2 only writes `pr_info/.blocked.txt` and stops. The issue calls this case "stop and ask" and says to report it in the session chat or as a comment on #12, with the `.claude-code-version` fallback as the question. Step 1 posts a comment for its own blocked precondition, but step 2 posts none, so a headless run stalls and the owner is never told. Fix: when a step 2 precondition fails, post a one-time `github_issue_comment` on #12 that names the failed check and asks about the fallback.
+pr_info/steps/step_5.md:7 — medium — Step 5 depends on the main session adding `Bash(npm run plugin:validate)` and `Bash(npm run plugin:test)` to `.claude/settings.json`. When they are missing, step 5 only writes `.blocked.txt`, and no step or comment asks anyone to make that edit. Only the summary mentions it (summary.md "Before step 5"). A headless implementer then blocks without a request reaching the owner or main session. Fix: on this precondition failure, post a one-time comment on #12 asking for the edit and quoting the owner permission from the issue.
+
+**Decisions**:
+
+dismiss
+
+**Changes**:
+
+dismiss
