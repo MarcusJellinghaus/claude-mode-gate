@@ -113,10 +113,9 @@ The strategy is layered. Cheap, deterministic gates run first, and the security 
 
 1. **Static analysis.** Strict TypeScript and type-aware ESLint catch type errors, unhandled promises (`no-floating-promises` matters here: an unhandled promise skips the fail-closed `.catch`) and non-exhaustive `switch` statements over verdicts or modes. Prettier keeps formatting out of reviews.
 2. **Architecture checks.** dependency-cruiser enforces the structure in "Architecture rules" below. knip removes dead code, which in a security gate is also attack surface.
-3. **Unit tests (vitest).** `policy.ts` is pure, so it is tested with tables: one row per case, with the call, the mode and the expected verdict. Cover at least:
+3. **Unit tests (vitest).** `policy.ts` is pure, so it is tested with tables: one row per case, with the call, the active rule sets, the guard results, Claude Code's verdict and the expected decision. Cover at least:
    - every rule in the decision order, and the order itself (the first match wins);
    - Bash with chained commands (`&&`, `;`, `|`), substitution (`$()`, backticks), newlines and odd spacing;
-   - protected paths, including relative paths and `..`;
    - that a deny from Claude Code is never overridden;
    - that unknown input falls back to `ask` or `deny`, never `allow`.
 4. **Wiring tests.** `register.ts` is thin and is tested through the plugin test kit once its API is verified (assumption 4 in `docs/design.md`). Include fail-closed tests (a guard that throws produces a deny), the reset test (after `/clear` no profile stays active) and the band test.
