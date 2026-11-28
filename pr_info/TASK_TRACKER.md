@@ -55,9 +55,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 6: per-rule findings (over-broad allow, unknown tool names) ([step_6.md](./steps/step_6.md))
 
-- [ ] Implementation: `tests/config-findings.test.ts`, `KNOWN_TOOLS` and the per-rule checks in `hooks/config.ts`
-- [ ] Quality checks (`npm run format`, `npm run check`) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `tests/config-findings.test.ts`, `KNOWN_TOOLS` and the per-rule checks in `hooks/config.ts`
+- [x] Quality checks (`npm run format`, `npm run check`) — fix all issues
+- [x] Commit message prepared
 
 ### Step 7: per-set findings (duplicates, covered allows) ([step_7.md](./steps/step_7.md))
 

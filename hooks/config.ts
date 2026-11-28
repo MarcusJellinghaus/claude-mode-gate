@@ -74,7 +74,8 @@ interface Issue {
   message: string;
 }
 type IssueSink = (severity: Severity, path: string, message: string) => void;
-type RuleLists = Pick<RuleSet, "allow" | "ask" | "deny">;
+type ListName = "allow" | "ask" | "deny";
+type RuleLists = Pick<RuleSet, ListName>;
 
 interface CheckedFile {
   issues: Issue[];
@@ -113,21 +114,179 @@ function checkKeys(
   return unknown.length === 0;
 }
 
-function checkList(raw: unknown, path: string, issue: IssueSink): Rule[] | undefined {
+// Copied by hand from the keys of BuiltinToolInputs in .claude-plugin/types/claude-code-tools/index.d.ts,
+// written by Claude Code 2.1.326. config.ts may not import engine types, so the list is a copy.
+const KNOWN_TOOLS: readonly string[] = [
+  "Agent",
+  "AppifactRepl",
+  "Artifact",
+  "ArtifactCheck",
+  "ArtifactComments",
+  "ArtifactData",
+  "AskUserQuestion",
+  "Bash",
+  "ClaudeDesign",
+  "CronCreate",
+  "CronDelete",
+  "CronList",
+  "DesignSync",
+  "Edit",
+  "enable__mcp__claude-in-chrome",
+  "enable__mcp__remote-devices__Claude_Browser",
+  "enable__mcp__remote-devices__computer",
+  "EndConversation",
+  "EnterPlanMode",
+  "EnterWorktree",
+  "ExitPlanMode",
+  "ExitWorktree",
+  "FetchInboxMessage",
+  "GetGoal",
+  "GetTask",
+  "Glob",
+  "Grep",
+  "ListAgents",
+  "ListConnectors",
+  "ListMcpResourcesTool",
+  "ListPlugins",
+  "ListSkills",
+  "LSP",
+  "memory_list",
+  "memory_read",
+  "memory_write",
+  "Monitor",
+  "NotebookEdit",
+  "OfferChromeSetup",
+  "PauseGoal",
+  "Poll",
+  "PowerShell",
+  "Projects",
+  "propose_skills",
+  "PublishPlugin",
+  "PushNotification",
+  "Read",
+  "ReadMcpResourceDirTool",
+  "ReadMcpResourceTool",
+  "ReadNotifications",
+  "ReadWidgetContext",
+  "RemoteTrigger",
+  "ReportFindings",
+  "request_computer",
+  "ScheduleWakeup",
+  "SearchMcpRegistry",
+  "SearchPlugins",
+  "SearchSkills",
+  "SendFeedback",
+  "SendFile",
+  "SendMessage",
+  "SendToProject",
+  "SendToProjectContext",
+  "SendUserFile",
+  "SendUserMessage",
+  "SetGoal",
+  "ShareOnboardingGuide",
+  "ShowOnboardingRolePicker",
+  "Skill",
+  "SuggestConnectors",
+  "SuggestPluginInstall",
+  "SuggestSkills",
+  "TaskCreate",
+  "TaskGet",
+  "TaskList",
+  "TaskStop",
+  "TaskUpdate",
+  "TodoWrite",
+  "ToolSearch",
+  "WaitForMcpServers",
+  "WebFetch",
+  "WebSearch",
+  "Workflow",
+  "WrapUp",
+  "Write",
+  "Yield",
+];
+
+const MAX_SUGGESTION_DISTANCE = 2;
+const OVER_BROAD_ERROR =
+  "Over-broad allow: the rule allows every command or every tool. Name what to allow.";
+const OVER_BROAD_WARNING =
+  "Over-broad allow: the rule allows every tool of the MCP server. Name the tools to allow.";
+
+// parseRule has checked the segments, so a server with no `__tool` part has no second "__".
+function isBareMcpServer(tool: string): boolean {
+  return tool.startsWith(MCP_PREFIX) && !tool.slice(MCP_PREFIX.length).includes("__");
+}
+
+function overBroadSeverity(rule: Rule): Severity | undefined {
+  if (rule.kind === "whole" && (rule.tool === "*" || rule.tool === "Bash")) return "error";
+  if (rule.kind === "prefix" && rule.arg === "") return "error";
+  if (rule.kind === "whole" && isBareMcpServer(rule.tool)) return "warning";
+  return undefined;
+}
+
+// Plain Levenshtein distance, one row at a time. Tool names are ASCII, so code points suffice.
+function editDistance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (const [i, charA] of Array.from(a).entries()) {
+    const current = [i + 1];
+    for (const [j, charB] of Array.from(b).entries()) {
+      const substitution = (previous.at(j) ?? 0) + (charA === charB ? 0 : 1);
+      const deletion = (previous.at(j + 1) ?? 0) + 1;
+      const insertion = (current.at(j) ?? 0) + 1;
+      current.push(Math.min(substitution, deletion, insertion));
+    }
+    previous = current;
+  }
+  return previous.at(b.length) ?? 0;
+}
+
+function unknownToolMessage(tool: string): string | undefined {
+  if (tool === "*" || tool.startsWith(MCP_PREFIX) || KNOWN_TOOLS.includes(tool)) return undefined;
+  if (tool === "Task") return "unknown tool `Task`; use `Agent`";
+  const ranked = KNOWN_TOOLS.map((name) => ({ name, distance: editDistance(tool, name) }));
+  const best = ranked.reduce((a, b) => (b.distance < a.distance ? b : a));
+  if (best.distance <= MAX_SUGGESTION_DISTANCE)
+    return `unknown tool \`${tool}\`; did you mean \`${best.name}\`?`;
+  return `unknown tool \`${tool}\``;
+}
+
+function checkEntry(
+  entry: unknown,
+  path: string,
+  list: ListName,
+  issue: IssueSink,
+): Rule | undefined {
+  if (typeof entry !== "string") {
+    issue("error", path, "expected a string");
+    return undefined;
+  }
+  const parsed = parseRule(entry);
+  if (!parsed.ok) {
+    issue("error", path, parsed.message);
+    return undefined;
+  }
+  const unknownTool = unknownToolMessage(parsed.rule.tool);
+  if (unknownTool !== undefined) issue("warning", path, unknownTool);
+  const severity = list === "allow" ? overBroadSeverity(parsed.rule) : undefined;
+  if (severity !== undefined)
+    issue(severity, path, severity === "error" ? OVER_BROAD_ERROR : OVER_BROAD_WARNING);
+  return severity === "error" ? undefined : parsed.rule;
+}
+
+function checkList(
+  raw: unknown,
+  prefix: string,
+  list: ListName,
+  issue: IssueSink,
+): Rule[] | undefined {
+  const path = `${prefix}.${list}`;
   if (raw === undefined) return [];
   if (!Array.isArray(raw)) {
     issue("error", path, "expected an array of strings");
     return undefined;
   }
-  const rules: Rule[] = [];
-  raw.forEach((entry: unknown, i) => {
-    if (typeof entry !== "string") {
-      issue("error", `${path}[${String(i)}]`, "expected a string");
-      return;
-    }
-    const parsed = parseRule(entry);
-    if (parsed.ok) rules.push(parsed.rule);
-    else issue("error", `${path}[${String(i)}]`, parsed.message);
+  const rules = raw.flatMap((entry: unknown, i) => {
+    const rule = checkEntry(entry, `${path}[${String(i)}]`, list, issue);
+    return rule ? [rule] : [];
   });
   return rules.length === raw.length ? rules : undefined;
 }
@@ -144,9 +303,9 @@ function checkRuleLists(
   }
   const keysOk = checkKeys(raw, prefix, keys, issue);
   const { allow: rawAllow, ask: rawAsk, deny: rawDeny } = raw;
-  const allow = checkList(rawAllow, `${prefix}.allow`, issue);
-  const ask = checkList(rawAsk, `${prefix}.ask`, issue);
-  const deny = checkList(rawDeny, `${prefix}.deny`, issue);
+  const allow = checkList(rawAllow, prefix, "allow", issue);
+  const ask = checkList(rawAsk, prefix, "ask", issue);
+  const deny = checkList(rawDeny, prefix, "deny", issue);
   if (!keysOk || !allow || !ask || !deny) return undefined;
   return { allow, ask, deny };
 }
